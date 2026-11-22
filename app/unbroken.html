@@ -1,0 +1,1376 @@
+<title>Unbroken</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=Instrument+Sans:wght@400..700&display=swap">
+<style>
+/* Layout: one phone-width column; photo tiles you double-tap; a Friends tab; bottom sheets for detail, editing, profile and settings. The app picks its own theme (Forest by default), so the viewer's light/dark setting is not followed on purpose. */
+:root{--bg:#0f1a12;--surface:#17241a;--surface-2:#203024;--ink:#e6eedf;--ink-2:#9db09a;--line:#29392c;--miss:#4a5d4c;--accent:#8fc46a;--on-accent:#0d160d;--danger:#ef8a6c;--on-danger:#1a0e0a;--knob:#eef3e8;--shadow:0 1px 0 rgba(0,0,0,.3),0 12px 26px -16px rgba(0,0,0,.85);--scrim:rgba(0,0,0,.6);color-scheme:dark;
+  --f-display:"Bricolage Grotesque","Avenir Next","Segoe UI",system-ui,sans-serif;
+  --f-body:"Instrument Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;}
+:root[data-ui="forest"]{--bg:#0f1a12;--surface:#17241a;--surface-2:#203024;--ink:#e6eedf;--ink-2:#9db09a;--line:#29392c;--miss:#4a5d4c;--accent:#8fc46a;--on-accent:#0d160d;--danger:#ef8a6c;--on-danger:#1a0e0a;--knob:#eef3e8;--shadow:0 1px 0 rgba(0,0,0,.3),0 12px 26px -16px rgba(0,0,0,.85);--scrim:rgba(0,0,0,.6);color-scheme:dark}
+:root[data-ui="moss"]{--bg:#e8ede0;--surface:#f7f9f2;--surface-2:#e1e8d6;--ink:#1b2a1e;--ink-2:#566753;--line:#d0d9c3;--miss:#a9b69c;--accent:#4a7a35;--on-accent:#ffffff;--danger:#b0402c;--on-danger:#ffffff;--knob:#ffffff;--shadow:0 1px 0 rgba(20,30,20,.05),0 10px 22px -16px rgba(20,30,20,.5);--scrim:rgba(17,26,19,.45);color-scheme:light}
+:root[data-ui="midnight"]{--bg:#0e1220;--surface:#161b2c;--surface-2:#1f2639;--ink:#e4e8f4;--ink-2:#9aa3bd;--line:#283049;--miss:#4a5470;--accent:#8fb0ff;--on-accent:#0c1020;--danger:#ff8a7a;--on-danger:#1a0c0a;--knob:#eef1fa;--shadow:0 1px 0 rgba(0,0,0,.3),0 12px 26px -16px rgba(0,0,0,.85);--scrim:rgba(0,0,0,.6);color-scheme:dark}
+:root[data-ui="ember"]{--bg:#1a1310;--surface:#241b16;--surface-2:#2f241d;--ink:#f1e6dc;--ink-2:#b8a596;--line:#3a2d24;--miss:#5e4b3e;--accent:#f0a060;--on-accent:#1a1008;--danger:#ff8a7a;--on-danger:#1a0c0a;--knob:#f6ede5;--shadow:0 1px 0 rgba(0,0,0,.3),0 12px 26px -16px rgba(0,0,0,.85);--scrim:rgba(0,0,0,.6);color-scheme:dark}
+:root[data-ui="sand"]{--bg:#ece6d8;--surface:#faf7ef;--surface-2:#e3dccb;--ink:#2a2419;--ink-2:#665b48;--line:#d9d0bc;--miss:#b3a78f;--accent:#5f6d27;--on-accent:#ffffff;--danger:#b0402c;--on-danger:#ffffff;--knob:#ffffff;--shadow:0 1px 0 rgba(20,30,20,.05),0 10px 22px -16px rgba(20,30,20,.5);--scrim:rgba(17,26,19,.45);color-scheme:light}
+:root[data-ui="ocean"]{--bg:#e3edf0;--surface:#f6fafb;--surface-2:#d6e4e8;--ink:#132a30;--ink-2:#4b666c;--line:#c8dade;--miss:#9ab2b7;--accent:#1d6b7c;--on-accent:#ffffff;--danger:#b0402c;--on-danger:#ffffff;--knob:#ffffff;--shadow:0 1px 0 rgba(20,30,20,.05),0 10px 22px -16px rgba(20,30,20,.5);--scrim:rgba(17,26,19,.45);color-scheme:light}
+
+*,*::before,*::after{box-sizing:border-box}
+body{background-color:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.45;-webkit-font-smoothing:antialiased;min-height:100%}
+body.locked{overflow:hidden}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--bg)}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+h1,h2,h3{margin:0;text-wrap:balance}
+p{margin:0}
+img{display:block}
+.wrap{width:100%;max-width:592px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+
+/* ---------- Header ---------- */
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:6;background:var(--bg);background:color-mix(in srgb,var(--bg) 88%,transparent);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px)}
+.top-in{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-block:12px 8px}
+.brand{display:flex;align-items:center;gap:9px}
+.mark{flex:none;color:var(--ink)}
+.mark .l2{stroke:var(--accent)}
+.brand h1{font:800 23px/1 var(--f-display);letter-spacing:-.025em}
+.top-actions{display:flex;gap:8px}
+.tabs{display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:4px;margin-bottom:10px;border-radius:14px;background:var(--surface-2)}
+.tabs button{border:none;background:transparent;border-radius:10px;padding:9px 10px;font:650 14px/1 var(--f-body);color:var(--ink-2);cursor:pointer}
+.tabs button[aria-selected="true"]{background:var(--surface);color:var(--ink);box-shadow:var(--shadow)}
+.icon-btn{width:40px;height:40px;border-radius:50%;border:1px solid var(--line);background:var(--surface);color:var(--ink);display:grid;place-items:center;cursor:pointer;padding:0;flex:none}
+.icon-btn[aria-pressed="true"]{background:var(--ink);color:var(--surface);border-color:var(--ink)}
+.icon-btn:disabled{opacity:.35;cursor:default}
+.icon-btn.sm{width:34px;height:34px}
+
+/* ---------- Summary ---------- */
+main.wrap{padding-block:4px 124px;display:flex;flex-direction:column;gap:16px}
+.summary{display:flex;flex-direction:column;gap:6px;padding-top:4px}
+.eyebrow{font-size:11.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-2)}
+.headline{font:780 31px/1.05 var(--f-display);letter-spacing:-.03em}
+.sub{font-size:13.5px;color:var(--ink-2)}
+.tally{display:flex;gap:4px;margin-block:8px 2px}
+.tally i{flex:1;height:9px;border-radius:5px;background:var(--surface-2);border:1px solid var(--line)}
+.tally i.on{background:var(--hc);border-color:var(--hc)}
+.notice{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 12px;font-size:13.5px}
+.reorder-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;background:var(--surface);border:1px dashed var(--ink-2);border-radius:14px;padding:10px 12px;font-size:13.5px;margin-bottom:4px}
+.grp{font:700 11.5px/1 var(--f-body);text-transform:uppercase;letter-spacing:.12em;color:var(--ink-2);margin:22px 4px 10px}
+#list>.group:first-child .grp,#list>.grp:first-child{margin-top:6px}
+
+/* ---------- Photo tiles ---------- */
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+@media (min-width:540px){.grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+.tile,.card,.mini{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+.tile{position:relative;display:flex;flex-direction:column;text-align:left;padding:0;border:none;border-radius:20px;background:var(--surface);overflow:hidden;cursor:pointer;box-shadow:var(--shadow);min-width:0}
+.tile.is-done{box-shadow:0 0 0 2px var(--hc),var(--shadow)}
+.media{position:relative;display:block;aspect-ratio:1;background:linear-gradient(155deg,color-mix(in srgb,var(--hc) 70%,var(--surface)),color-mix(in srgb,var(--hc) 22%,var(--surface)));overflow:hidden}
+.media img{width:100%;height:100%;object-fit:cover;pointer-events:none}
+.glyph{position:absolute;inset:0;display:grid;place-items:center;font:700 52px/1 var(--f-display);color:var(--ink);padding-bottom:14%}
+.media::after{content:"";position:absolute;inset:auto 0 0;height:58%;background:linear-gradient(to top,rgba(12,20,13,.66),rgba(12,20,13,0))}
+.tile-streak{position:absolute;left:12px;bottom:10px;z-index:1;display:flex;align-items:baseline;gap:5px;color:#ffffff;text-shadow:0 1px 10px rgba(0,0,0,.35)}
+.tile-streak b{font:800 34px/1 var(--f-display);letter-spacing:-.03em;font-variant-numeric:tabular-nums}
+.tile-streak small{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.08em}
+.badge{position:absolute;top:9px;right:9px;z-index:1;display:inline-flex;align-items:center;gap:3px;padding:5px 9px;border-radius:999px;background:rgba(247,249,242,.9);color:#1b2a1e;font:700 12px/1 var(--f-body);font-variant-numeric:tabular-nums}
+.badge.on{background:var(--hc);color:var(--hc-on)}
+.badge svg{width:14px;height:14px}
+.tile-body{display:flex;flex-direction:column;gap:1px;padding:10px 12px 12px;min-width:0}
+.nm{font-weight:650;font-size:15.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.meta{font-size:12.5px;color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.burst{position:absolute;left:50%;top:40%;z-index:3;width:78px;height:78px;margin:-39px 0 0 -39px;border-radius:50%;display:grid;place-items:center;background:var(--hc);color:var(--hc-on);font:800 26px/1 var(--f-display);pointer-events:none;box-shadow:0 10px 26px -10px rgba(0,0,0,.55);animation:burst .8s cubic-bezier(.2,.8,.3,1) forwards}
+.card .burst{left:auto;right:30px;top:50%;width:58px;height:58px;margin:-29px 0 0;font-size:20px}
+@keyframes burst{0%{transform:scale(.3);opacity:0}25%{transform:scale(1.12);opacity:1}60%{transform:scale(1);opacity:1}100%{transform:translateY(-34px) scale(.9);opacity:0}}
+
+/* ---------- List cards ---------- */
+.cards{display:flex;flex-direction:column;gap:10px}
+.card{position:relative;display:grid;grid-template-columns:52px minmax(0,1fr) auto auto;align-items:center;gap:12px;width:100%;text-align:left;padding:10px 12px 10px 10px;background:var(--surface);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow);cursor:pointer}
+div.card{cursor:default}
+.thumb{position:relative;width:52px;height:52px;border-radius:14px;overflow:hidden;display:grid;place-items:center;background:color-mix(in srgb,var(--hc) 22%,var(--surface));font:700 24px/1 var(--f-display);flex:none}
+.thumb img{width:100%;height:100%;object-fit:cover;pointer-events:none}
+.thumb .glyph{position:static;padding:0;font-size:24px}
+.txt{display:flex;flex-direction:column;min-width:0;gap:1px}
+.streak{display:flex;flex-direction:column;align-items:flex-end;line-height:1;min-width:30px}
+.streak b{font:800 28px/1 var(--f-display);font-variant-numeric:tabular-nums;letter-spacing:-.03em}
+.streak small{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.09em;color:var(--ink-2);margin-top:4px}
+.streak.pending b{color:var(--ink-2)}
+.today{position:relative;width:40px;height:40px;border-radius:50%;border:2px solid var(--hc);color:var(--hc);display:grid;place-items:center;flex:none;font:700 13px/1 var(--f-body);font-variant-numeric:tabular-nums}
+.today svg{width:20px;height:20px;position:relative}
+.today.on{background:var(--hc);color:var(--hc-on)}
+.today.off{border-style:dashed;opacity:.7}
+.today.rest{border-color:var(--miss);color:var(--ink-2)}
+.today.multi{border:none;background:conic-gradient(var(--hc) calc(var(--p) * 360deg),var(--surface-2) 0)}
+.today.multi::before{content:"";position:absolute;inset:4px;border-radius:50%;background:var(--surface)}
+.today.multi.on::before{background:var(--hc)}
+.today span{position:relative;color:var(--ink)}
+.today.on span{color:var(--hc-on)}
+.today small{font-size:9px;opacity:.75}
+.mv{display:flex;gap:6px;grid-column:span 2;justify-self:end}
+.hidden-note{font-size:13.5px;color:var(--ink-2);text-align:center;margin-top:12px}
+.link{background:none;border:none;padding:4px;font-weight:700;color:var(--accent);cursor:pointer;text-decoration:underline;text-underline-offset:3px}
+
+/* ---------- Chain cells ---------- */
+.s-done{--bgc:var(--hc);--bdc:var(--hc);--fgc:var(--hc-on)}
+.s-frozen{--bdc:var(--hc);--bgi:repeating-linear-gradient(135deg,color-mix(in srgb,var(--hc) 55%,transparent) 0 2px,transparent 2px 5px)}
+.s-skip{--bdc:var(--ink-2);--bds:dashed;--fgc:var(--ink-2)}
+.s-missed{--bdc:var(--miss);--bgi:linear-gradient(135deg,transparent 45%,var(--miss) 45% 56%,transparent 56%);--fgc:var(--ink-2)}
+.s-due{--bdc:var(--hc)}
+.s-partial{--bdc:var(--hc);--bgc:color-mix(in srgb,var(--hc) 30%,transparent)}
+.s-off,.s-pre{--bdc:transparent;--fgc:var(--ink-2)}
+.s-future{--bds:dotted;--fgc:var(--ink-2)}
+.strip{display:flex;gap:5px;margin-top:7px;overflow:hidden}
+.d{display:flex;flex-direction:column;align-items:center;gap:3px}
+.d i,.lg{position:relative;display:block;width:16px;height:16px;border-radius:5px;border:1.5px var(--bds,solid) var(--bdc,var(--line));background-color:var(--bgc,transparent);background-image:var(--bgi,none)}
+.d.s-off i,.d.s-pre i{background-image:radial-gradient(circle,var(--miss) 1.6px,transparent 2px)}
+.d.s-pre i{opacity:.5}
+.d em{font-style:normal;font-size:9.5px;line-height:1;font-weight:650;color:var(--ink-2)}
+.d.now em{color:var(--ink);text-decoration:underline;text-underline-offset:2px}
+.d.jl i::before{content:"";position:absolute;top:50%;right:100%;width:8px;height:4px;margin-top:-2px;background:var(--hc)}
+.strip.sm{gap:4px}
+.strip.sm .d i{width:14px;height:14px;border-radius:4px}
+.strip.sm .d.jl i::before{width:7px}
+
+/* ---------- Friends ---------- */
+.me-card,.join,.fblock{background:var(--surface);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow)}
+.me-card{display:flex;align-items:center;gap:14px;padding:14px}
+.me-t{display:flex;flex-direction:column;min-width:0;flex:1}
+.me-t b{font:750 18px/1.2 var(--f-display)}
+.me-t span{font-size:13px;color:var(--ink-2)}
+.join{display:flex;flex-direction:column;gap:12px;padding:16px}
+.join h3{font:780 20px/1.1 var(--f-display);margin-bottom:4px}
+.join p,.muted-note{color:var(--ink-2);font-size:14px}
+.av{position:relative;width:40px;height:40px;border-radius:50%;overflow:hidden;flex:none;display:grid;place-items:center;background:color-mix(in srgb,var(--accent) 24%,var(--surface));font:750 16px/1 var(--f-display);color:var(--ink)}
+.av img{width:100%;height:100%;object-fit:cover}
+.av.av-lg{width:64px;height:64px;font-size:24px}
+.av.av-xl{width:88px;height:88px;font-size:32px}
+.fblock{display:flex;flex-direction:column;gap:10px;padding:12px}
+.fblock+.fblock{margin-top:10px}
+.fhead{display:flex;align-items:center;gap:10px;border:none;background:none;padding:0;text-align:left;cursor:pointer;min-width:0}
+.fhead b{font-size:15.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pill{flex:none;font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:4px 8px;border-radius:999px;background:var(--surface-2);color:var(--ink-2)}
+.scroller{display:flex;gap:10px;overflow-x:auto;padding-bottom:4px;scroll-snap-type:x proximity;overscroll-behavior-x:contain}
+.mini{flex:none;width:118px;display:flex;flex-direction:column;gap:6px;padding:0;border:none;background:none;text-align:left;cursor:pointer;scroll-snap-align:start}
+.mini .media{border-radius:14px}
+.mini .glyph{font-size:36px}
+.mini .tile-streak{left:9px;bottom:7px}
+.mini .tile-streak b{font-size:26px}
+.mini .badge{top:6px;right:6px;padding:4px 6px}
+.mini-t{font-size:13px;font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-inline:2px}
+.set{border:1px solid var(--line);border-radius:16px;overflow:hidden;background:var(--surface)}
+.prow{display:flex;align-items:center;gap:10px;padding:10px 12px}
+.prow+.prow{border-top:1px solid var(--line)}
+.pmain{display:flex;align-items:center;gap:12px;flex:1;min-width:0;border:none;background:none;padding:0;text-align:left;cursor:pointer}
+.pmain>span:last-child{display:flex;flex-direction:column;min-width:0}
+.pmain b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pmain small{font-size:12.5px;color:var(--ink-2)}
+.phead{display:flex;flex-direction:column;align-items:center;text-align:center;gap:8px;padding-block:4px 6px}
+.phead h3{font:780 24px/1.1 var(--f-display)}
+.phead p{color:var(--ink-2);max-width:40ch}
+
+/* ---------- Sheet ---------- */
+.sheet-wrap{position:fixed;inset:0;z-index:20;display:flex;align-items:flex-end;justify-content:center}
+.scrim{position:absolute;inset:0;background:var(--scrim);animation:fade .2s ease-out}
+.sheet{position:relative;width:100%;max-width:592px;max-height:calc(100% - env(safe-area-inset-top,0px) - 20px);background:var(--surface);border-radius:22px 22px 0 0;display:flex;flex-direction:column;animation:up .24s cubic-bezier(.2,.8,.3,1);box-shadow:0 -10px 40px -20px rgba(0,0,0,.4)}
+.sheet:focus{outline:none}
+.sheet-body{overflow:auto;overscroll-behavior:contain;padding-top:0;padding-bottom:calc(22px + env(safe-area-inset-bottom,0px));padding-left:max(18px,env(safe-area-inset-left,0px));padding-right:max(18px,env(safe-area-inset-right,0px))}
+.sh-head{position:sticky;top:0;z-index:2;display:flex;align-items:center;justify-content:space-between;gap:12px;padding-block:16px 12px;background:var(--surface)}
+.sh-head h2{font:780 22px/1.1 var(--f-display);letter-spacing:-.02em}
+.dh{display:flex;align-items:center;gap:12px;min-width:0;flex:1}
+.dh-t{min-width:0;flex:1}
+.dh-t h2{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dh-t p{font-size:13px;color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+@media (min-width:640px){.sheet-wrap{align-items:center;padding:24px}.sheet{border-radius:22px;max-height:88vh}}
+@keyframes up{from{transform:translateY(28px);opacity:0}to{transform:none;opacity:1}}
+@keyframes fade{from{opacity:0}}
+
+/* ---------- Detail ---------- */
+.detail{display:flex;flex-direction:column;gap:18px}
+.banner{border-radius:18px;overflow:hidden;aspect-ratio:16/10;background:var(--surface-2)}
+.banner img{width:100%;height:100%;object-fit:cover}
+.big{display:flex;align-items:flex-end;gap:12px;padding-top:4px}
+.bignum{font:800 80px/.85 var(--f-display);letter-spacing:-.05em;font-variant-numeric:tabular-nums}
+.bignum.pending{color:var(--ink-2)}
+.bigl{font-weight:650;color:var(--ink-2);padding-bottom:6px}
+.line{font-size:15px;margin-top:-8px}
+.todayctl{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.stats div{background:var(--surface-2);border-radius:12px;padding:10px 12px;display:flex;flex-direction:column;gap:4px;min-width:0}
+.stats span{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.09em;color:var(--ink-2)}
+.stats b{font:750 20px/1.1 var(--f-display);font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+@media (min-width:480px){.stats{grid-template-columns:repeat(4,minmax(0,1fr))}}
+.cal{display:flex;flex-direction:column;gap:10px}
+.cal-head{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.cal-head h3{font:750 17px/1 var(--f-display);display:flex;align-items:baseline;gap:8px}
+.cal-head small{font:600 12px var(--f-body);color:var(--ink-2)}
+.cal-dow,.cal-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px}
+.cal-dow span{text-align:center;font-size:10.5px;font-weight:700;color:var(--ink-2);letter-spacing:.06em}
+.cd{position:relative;aspect-ratio:1;max-width:100%;border-radius:10px;border:1.5px var(--bds,solid) var(--bdc,var(--line));background-color:var(--bgc,transparent);background-image:var(--bgi,none);color:var(--fgc,var(--ink));display:grid;place-items:center;font:650 13px/1 var(--f-body);font-variant-numeric:tabular-nums;cursor:pointer;padding:0}
+span.cd{cursor:default}
+.cd.part{background-image:linear-gradient(to top,color-mix(in srgb,var(--hc) 42%,transparent) calc(var(--p) * 100%),transparent 0)}
+.cd.blank{border:none;visibility:hidden}
+.cd.now{box-shadow:0 0 0 2px var(--surface),0 0 0 3.5px var(--ink)}
+.cd:disabled{cursor:default;opacity:.5}
+.cd.jl::before{content:"";position:absolute;top:50%;right:100%;width:9px;height:5px;margin-top:-2.5px;background:var(--hc)}
+.legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;color:var(--ink-2)}
+.legend span{display:flex;align-items:center;gap:6px}
+.lg{width:12px;height:12px;border-radius:4px}
+.hint{font-size:12.5px;color:var(--ink-2)}
+.note{margin:0;padding:12px 14px;border-radius:12px;background:var(--surface-2);font-size:14.5px}
+.actions{display:flex;flex-wrap:wrap;gap:10px}
+
+/* ---------- Controls ---------- */
+.btn{font:650 15px/1 var(--f-body);padding:13px 18px;border-radius:14px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer}
+.btn.sm{padding:10px 14px;font-size:14px;border-radius:12px}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.btn.danger{background:var(--danger);border-color:var(--danger);color:var(--on-danger)}
+.btn.ghost{background:transparent}
+.btn.danger-text{color:var(--danger)}
+.btn[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:var(--surface)}
+.form,.settings{display:flex;flex-direction:column;gap:22px;padding-bottom:6px}
+.field{display:flex;flex-direction:column;gap:8px;min-width:0}
+.lab{font:700 11.5px/1 var(--f-body);text-transform:uppercase;letter-spacing:.1em;color:var(--ink-2)}
+input,textarea,select{font:inherit;font-size:16px;color:var(--ink);background:var(--surface-2);border:1.5px solid transparent;border-radius:12px;padding:12px 14px;width:100%;min-width:0}
+textarea{resize:vertical}
+select{width:auto;padding:10px 12px;cursor:pointer}
+input:focus,textarea:focus,select:focus{outline:none;border-color:var(--accent)}
+.err{color:var(--danger);font-size:13px;font-weight:600}
+.photo-pick{display:flex;gap:14px;align-items:center}
+.pp{position:relative;width:96px;height:96px;border-radius:18px;overflow:hidden;flex:none;display:grid;place-items:center;background:color-mix(in srgb,var(--hc) 24%,var(--surface));font:700 40px/1 var(--f-display)}
+.pp .glyph{position:static;padding:0;font-size:40px}
+.pp.round{border-radius:50%;background:color-mix(in srgb,var(--accent) 24%,var(--surface))}
+.pp img{width:100%;height:100%;object-fit:cover}
+.pp-col{display:flex;flex-direction:column;gap:8px;align-items:flex-start;min-width:0}
+.icons{display:grid;grid-template-columns:repeat(auto-fill,minmax(42px,1fr));gap:6px}
+.ib{aspect-ratio:1;font-size:20px;border-radius:11px;border:1.5px solid var(--line);background:var(--surface);cursor:pointer;padding:0}
+.ib[aria-pressed="true"]{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 15%,var(--surface))}
+.inline{display:flex;align-items:center;gap:10px;font-size:14px;color:var(--ink-2)}
+.inline input{width:84px;text-align:center}
+.swatches{display:flex;flex-wrap:wrap;gap:9px}
+.sw{position:relative;width:34px;height:34px;border-radius:50%;background:var(--c);border:none;cursor:pointer;padding:0;box-shadow:inset 0 0 0 1px rgba(0,0,0,.1)}
+.sw[aria-pressed="true"],.sw.sel{box-shadow:0 0 0 2px var(--surface),0 0 0 4px var(--ink)}
+.sw.acc{background:linear-gradient(135deg,var(--c) 50%,var(--c2) 50%)}
+.sw.custom{overflow:hidden;background:conic-gradient(#5f8f3e,#c9a227,#b5523b,#7c6aa3,#3c8d8a,#5f8f3e)}
+.sw.custom.sel{background:var(--c)}
+.sw.custom input{position:absolute;inset:0;opacity:0;width:100%;height:100%;padding:0;border:0;cursor:pointer}
+.seg{display:flex;flex-wrap:wrap;gap:6px}
+.seg button,.days button{font:650 14px/1 var(--f-body);padding:10px 13px;border-radius:999px;border:1.5px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer}
+.seg button[aria-pressed="true"],.days button[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:var(--surface)}
+.days{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px}
+.days button{padding:11px 0;border-radius:10px;font-size:13px}
+.row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.stepper{display:inline-flex;align-items:center;border:1.5px solid var(--line);border-radius:12px;overflow:hidden;background:var(--surface)}
+.stepper button{width:42px;height:42px;border:none;background:var(--surface-2);color:var(--ink);cursor:pointer;display:grid;place-items:center;padding:0}
+.stepper button:disabled{opacity:.35;cursor:default}
+.stepper output{min-width:46px;padding-inline:8px;text-align:center;font:700 17px/1 var(--f-body);font-variant-numeric:tabular-nums}
+.stepper.big button{width:50px;height:50px}
+.stepper.big output{min-width:120px;font:780 22px/1 var(--f-display)}
+.stepper.big small{font:600 13px var(--f-body);color:var(--ink-2)}
+.danger{border-top:1px solid var(--line);padding-top:16px;display:flex;flex-direction:column;gap:10px}
+.settings section{display:flex;flex-direction:column;gap:8px}
+.settings h3{font:700 11.5px/1 var(--f-body);text-transform:uppercase;letter-spacing:.1em;color:var(--ink-2);padding-left:4px}
+.srow{display:flex;align-items:center;justify-content:space-between;gap:10px 14px;padding:12px 14px;flex-wrap:wrap}
+.srow+.srow{border-top:1px solid var(--line)}
+.srow.col{flex-direction:column;align-items:stretch}
+.sl{display:flex;flex-direction:column;gap:2px;font-weight:600;min-width:0;flex:1}
+.sl small{font-weight:400;font-size:12.5px;color:var(--ink-2)}
+.muted{color:var(--ink-2);font-weight:400}
+.arow{display:flex;align-items:center;gap:10px;font-weight:600;min-width:0}
+.ico-sm{width:30px;height:30px;border-radius:9px;overflow:hidden;display:grid;place-items:center;font-size:15px;background:color-mix(in srgb,var(--hc) 22%,var(--surface));flex:none}
+.ico-sm img{width:100%;height:100%;object-fit:cover}
+.tg{position:relative;width:48px;height:28px;border-radius:999px;border:none;background:var(--line);cursor:pointer;flex:none;padding:0}
+.tg::after{content:"";position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:var(--knob);box-shadow:0 1px 3px rgba(0,0,0,.25);transition:transform .15s}
+.tg[aria-checked="true"]{background:var(--accent)}
+.tg[aria-checked="true"]::after{transform:translateX(20px)}
+.switch-row{display:flex;align-items:center;justify-content:space-between;gap:14px}
+.file{position:relative;overflow:hidden;display:inline-block}
+.file input{position:absolute;inset:0;opacity:0;cursor:pointer}
+
+/* ---------- Empty state ---------- */
+.empty{display:flex;flex-direction:column;gap:18px}
+.demo{position:relative}
+.tag{position:absolute;top:-9px;left:14px;z-index:1;background:var(--ink);color:var(--surface);font-size:10.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;padding:4px 8px;border-radius:6px}
+.demo .card{pointer-events:none}
+.tpls{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px}
+.tpl{display:flex;align-items:center;gap:10px;padding:10px;border:1px solid var(--line);border-radius:14px;background:var(--surface);text-align:left;cursor:pointer;min-width:0}
+.tpl .ico-sm{width:36px;height:36px;border-radius:10px;font-size:18px}
+.tpl span:last-child{display:flex;flex-direction:column;min-width:0}
+.tpl b{font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tpl small{font-size:12px;color:var(--ink-2)}
+.empty h2{font:780 22px/1.1 var(--f-display);letter-spacing:-.02em}
+.empty p{color:var(--ink-2);max-width:60ch}
+.empty-card{display:flex;flex-direction:column;align-items:center;text-align:center;gap:12px;padding:36px 20px;background:var(--surface);border-radius:22px;box-shadow:var(--shadow)}
+.empty-card p{max-width:34ch}
+.photo-big{position:relative;display:grid;place-items:center;width:min(100%,240px);aspect-ratio:1;border-radius:22px;overflow:hidden;background:color-mix(in srgb,var(--hc) 14%,var(--surface-2));border:1.5px dashed color-mix(in srgb,var(--hc) 45%,var(--line));cursor:pointer}
+.photo-big.has{border:none}
+.photo-big img{width:100%;height:100%;object-fit:cover}
+.photo-big input{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;padding:0}
+.photo-big:focus-within{outline:2px solid var(--accent);outline-offset:3px}
+.pb-empty{display:flex;flex-direction:column;align-items:center;gap:6px;color:var(--ink-2);pointer-events:none}
+.pb-empty svg{width:30px;height:30px}
+.pb-empty b{color:var(--ink);font-size:15px}
+.pb-empty small{font-size:12.5px}
+.paste-box{font-size:14px;line-height:1.4;padding:10px 12px;min-height:44px;max-height:44px;overflow:hidden;border-radius:12px;background:transparent;border:1.5px dashed var(--line);color:var(--ink);caret-color:transparent;outline:none;white-space:nowrap}
+.paste-box:empty::before{content:attr(data-ph);color:var(--ink-2)}
+.paste-box:focus{border-color:var(--accent)}
+.photo-big.round+.row,.photo-big.round~.paste-box{align-self:center;max-width:260px}
+.photo-big{-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none}
+.native{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.native-file{width:auto;font-size:13px;padding:6px 8px;background:var(--surface-2);border:none;color:var(--ink-2)}
+.reminder{display:flex;align-items:center;gap:10px;padding:12px 14px;margin-bottom:12px;border-radius:16px;background:color-mix(in srgb,var(--accent) 16%,var(--surface));font-size:14px;font-weight:600}
+.reminder svg{flex:none;color:var(--accent)}
+.reminder span{flex:1}
+.photo-big:not(.has):not(.round){background:linear-gradient(155deg,color-mix(in srgb,var(--hc) 70%,var(--surface)),color-mix(in srgb,var(--hc) 22%,var(--surface)));border-style:solid;border-color:transparent}
+.photo-big:not(.has):not(.round) .pb-empty{color:var(--ink)}
+.pb-glyph{font:700 84px/1 var(--f-display)}
+.presets{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px}
+.preset{aspect-ratio:1;border-radius:14px;border:none;padding:0;cursor:pointer;font-size:24px;background:linear-gradient(155deg,color-mix(in srgb,var(--hc) 70%,var(--surface)),color-mix(in srgb,var(--hc) 22%,var(--surface)))}
+.preset.round{border-radius:50%}
+.preset[aria-pressed="true"]{box-shadow:0 0 0 2px var(--surface),0 0 0 4px var(--ink)}
+.more-btn{display:inline-flex;align-items:center;gap:6px;align-self:flex-start;border:none;background:none;padding:6px 2px;font:650 14px var(--f-body);color:var(--ink-2);cursor:pointer}
+.more-btn svg{width:16px;height:16px}
+.more{border-top:1px solid var(--line);padding-top:20px}
+.photo-big.round{border-radius:50%;width:168px;align-self:center;margin-top:8px}
+.themes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;width:100%}
+.theme-card{display:flex;flex-direction:column;gap:7px;padding:6px 6px 9px;border-radius:14px;border:1.5px solid var(--line);background:var(--surface);cursor:pointer;font:650 13px/1 var(--f-body);color:var(--ink);text-align:left}
+.theme-card[aria-pressed="true"]{border-color:var(--accent);box-shadow:0 0 0 1.5px var(--accent)}
+.tc-prev{position:relative;display:block;height:56px;border-radius:9px;background:var(--t-bg);overflow:hidden;box-shadow:inset 0 0 0 1px rgba(127,127,127,.25)}
+.tc-prev::before{content:"";position:absolute;left:8px;right:8px;top:8px;height:22px;border-radius:6px;background:var(--t-surface)}
+.tc-prev::after{content:"";position:absolute;right:9px;bottom:7px;width:15px;height:15px;border-radius:50%;background:var(--t-acc)}
+.me-btn{padding:0;border:none;background:none;border-radius:50%;cursor:pointer;flex:none}
+.me-btn .av{width:40px;height:40px;box-shadow:0 0 0 2px var(--surface)}
+
+/* ---------- Footer, FAB, toast ---------- */
+.howto{font-size:12px;color:var(--ink-2);text-align:center;margin-top:18px;opacity:.9}
+.foot{display:flex;align-items:center;justify-content:center;gap:8px;font-size:12px;color:var(--ink-2);text-align:center;opacity:.8}
+.foot i{flex:none;width:6px;height:6px;border-radius:50%;background:var(--miss)}
+.foot.ok i{background:var(--accent)}
+.fab{position:fixed;z-index:8;bottom:calc(18px + env(safe-area-inset-bottom,0px));right:max(calc(16px + env(safe-area-inset-right,0px)),calc(50% - 280px));display:inline-flex;align-items:center;gap:8px;padding:14px 20px 14px 16px;border-radius:999px;border:none;background:var(--accent);color:var(--on-accent);font:700 15px/1 var(--f-body);box-shadow:0 12px 26px -12px color-mix(in srgb,var(--accent) 80%,transparent),var(--shadow);cursor:pointer}
+.toast{position:fixed;left:50%;bottom:calc(86px + env(safe-area-inset-bottom,0px));transform:translate(-50%,12px);opacity:0;pointer-events:none;z-index:30;display:flex;align-items:center;gap:14px;width:max-content;max-width:calc(100% - 32px);background:var(--ink);color:var(--bg);padding:11px 12px 11px 16px;border-radius:14px;font-weight:600;font-size:14px;transition:opacity .2s,transform .2s;box-shadow:var(--shadow)}
+.toast.show{opacity:1;transform:translate(-50%,0);pointer-events:auto}
+.toast.big{font:750 16px/1.2 var(--f-display);padding-block:14px}
+.toast button{background:none;border:none;color:inherit;font:700 14px var(--f-body);text-decoration:underline;text-underline-offset:3px;cursor:pointer;padding:4px}
+
+/* ---------- Motion ---------- */
+@keyframes pop{0%{transform:scale(1)}40%{transform:scale(1.14)}100%{transform:scale(1)}}
+.pop .tile-streak b,.pop .streak b{animation:pop .5s ease-out}
+
+/* ---------- Density ---------- */
+.compact .cards{gap:6px}
+.compact .card{grid-template-columns:38px minmax(0,1fr) auto auto;padding:7px 10px 7px 8px;border-radius:14px}
+.compact .thumb{width:38px;height:38px;border-radius:10px;font-size:18px}
+.compact .thumb .glyph{font-size:18px}
+.compact .today{width:34px;height:34px}
+.compact .today svg{width:17px;height:17px}
+.compact .streak b{font-size:23px}
+@media (max-width:360px){.streak b{font-size:24px}.headline{font-size:27px}.tile-streak b{font-size:28px}}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
+</style>
+
+<header class="top">
+  <div class="wrap">
+    <div class="top-in">
+      <div class="brand">
+        <svg class="mark" viewBox="0 0 34 22" width="34" height="22" aria-hidden="true"><rect x="2" y="3" width="18" height="16" rx="8" fill="none" stroke="currentColor" stroke-width="3.2"/><rect class="l2" x="14" y="3" width="18" height="16" rx="8" fill="none" stroke-width="3.2"/></svg>
+        <h1>Unbroken</h1>
+      </div>
+      <div class="top-actions">
+        <button class="me-btn" id="btnMe" data-act="me" aria-label="Your profile" hidden></button>
+        <button class="icon-btn" id="btnSettings" data-act="settings" aria-label="Settings"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M4 6h9M19 6h1M4 12h3M13 12h7M4 18h11M21 18h-1"/><circle cx="16" cy="6" r="2.4"/><circle cx="10" cy="12" r="2.4"/><circle cx="18" cy="18" r="2.4"/></svg></button>
+      </div>
+    </div>
+    <nav class="tabs" role="tablist" aria-label="Views">
+      <button role="tab" id="tabMine" data-act="tab" data-v="mine" aria-selected="true">My streaks</button>
+      <button role="tab" id="tabFriends" data-act="tab" data-v="friends" aria-selected="false">Friends</button>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <section id="summary" class="summary"></section>
+  <div id="notice" class="notice" role="status" hidden></div>
+  <div id="list"></div>
+  <div id="empty" class="empty" hidden></div>
+  <div>
+    <p id="howto" class="howto"></p>
+    <p id="storeNote" class="foot"></p>
+  </div>
+</main>
+
+<button class="fab" id="fab" data-act="new"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>New streak</button>
+
+<div id="sheet" class="sheet-wrap" hidden>
+  <div class="scrim" data-act="close"></div>
+  <div class="sheet" role="dialog" aria-modal="true" aria-label="Streak" tabindex="-1"><div class="sheet-body" id="sheetBody"></div></div>
+</div>
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+<script>
+(() => {
+'use strict';
+/* ---------- Constants ---------- */
+const KEY='unbroken:v1', TABKEY='unbroken:tab', DAY=864e5;
+const DN=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'], DNL=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'], DL=['S','M','T','W','T','F','S'];
+const MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'], MONL=['January','February','March','April','May','June','July','August','September','October','November','December'];
+const THEMES={forest:['Forest','#0f1a12','#17241a','#8fc46a'],moss:['Moss','#e8ede0','#f7f9f2','#4a7a35'],midnight:['Midnight','#0e1220','#161b2c','#8fb0ff'],ember:['Ember','#1a1310','#241b16','#f0a060'],sand:['Sand','#ece6d8','#faf7ef','#5f6d27'],ocean:['Ocean','#e3edf0','#f6fafb','#1d6b7c']};
+const COLORS=['#5f8f3e','#8aa83a','#a39a35','#c9a227','#cf7a3a','#b5523b','#8c5a3c','#2f7d5b','#3c8d8a','#4f7aa3','#7c6aa3','#b25a7a'];
+const ICONS=['📚','💧','🏃','🧘','💪','🥗','😴','✍️','🎸','🧹','💊','🚭','🌱','☀️','🦷','🧠','💻','🎨','🐕','📞','💰','🙏','🚶','🍎','🛏️','📵','🧴','🗣️'];
+const PRESETS=[['📚','#5f8f3e'],['💧','#3c8d8a'],['🏃','#cf7a3a'],['🧘','#7c6aa3'],['💪','#b5523b'],['🥗','#8aa83a'],['😴','#4f7aa3'],['🎸','#b25a7a'],['🌱','#2f7d5b'],['✍️','#a39a35'],['🧠','#c9a227'],['🚶','#8c5a3c']];
+const AVATARS=[['🌲','#2f7d5b'],['🦊','#cf7a3a'],['🐻','#8c5a3c'],['🌻','#c9a227'],['🍄','#b5523b'],['🦉','#7c6aa3'],['🐢','#5f8f3e'],['🌙','#4f7aa3'],['⛰️','#3c8d8a'],['🌊','#1d6b7c'],['🔥','#a24c2e'],['🐝','#a39a35']];
+const SCHED=[['daily','Every day'],['weekdays','Certain days'],['interval','Every few days'],['perWeek','Times a week'],['perMonth','Times a month']];
+const DEF={remind:true,remindAt:'07:00',theme:'forest',weekStart:1,rollover:0,layout:'grid',sort:'manual',groups:true,hideDone:false,celebrate:true};
+const MILE={day:[3,7,14,21,30,50,75,100,150,200,250,300,365,500,750,1000],week:[2,4,8,12,26,52,104],month:[3,6,12,24,36]};
+const HEX=/^#[0-9a-f]{6}$/i, DATE=/^\d{4}-\d\d-\d\d$/, SEG=/^[A-Za-z0-9_\-.~:@+]{1,64}$/, IMG=/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/;
+const sv=p=>`<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${p}</svg>`;
+const I={check:sv('<path d="M5 12.5l4.5 4.5L19 7.5"/>'),plus:sv('<path d="M12 5v14M5 12h14"/>'),minus:sv('<path d="M5 12h14"/>'),x:sv('<path d="M6 6l12 12M18 6L6 18"/>'),left:sv('<path d="M15 6l-6 6 6 6"/>'),right:sv('<path d="M9 6l6 6-6 6"/>'),up:sv('<path d="M6 15l6-6 6 6"/>'),down:sv('<path d="M6 9l6 6 6-6"/>'),moon:sv('<path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/>')};
+
+/* ---------- Helpers ---------- */
+const $=s=>document.querySelector(s);
+const has=(o,k)=>Object.prototype.hasOwnProperty.call(o,k);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
+const clean=o=>JSON.parse(JSON.stringify(o));
+const stable=o=>JSON.stringify(o,(k,v)=>v&&typeof v==='object'&&!Array.isArray(v)?Object.keys(v).sort().reduce((a,x)=>(a[x]=v[x],a),{}):v);
+const okImg=s=>typeof s==='string'&&s.length<160000&&IMG.test(s)?s:'';
+const pad=n=>String(n).padStart(2,'0');
+const keyOf=d=>{const x=new Date(d*DAY);return x.getUTCFullYear()+'-'+pad(x.getUTCMonth()+1)+'-'+pad(x.getUTCDate());};
+const dnOf=k=>{const [y,m,d]=k.split('-').map(Number);return Math.round(Date.UTC(y,m-1,d)/DAY);};
+const dow=d=>new Date(d*DAY).getUTCDay();
+const monthStartOf=d=>{const x=new Date(d*DAY);return Math.round(Date.UTC(x.getUTCFullYear(),x.getUTCMonth(),1)/DAY);};
+const monthEndOf=d=>{const x=new Date(d*DAY);return Math.round(Date.UTC(x.getUTCFullYear(),x.getUTCMonth()+1,0)/DAY);};
+const addMonths=(d,n)=>{const x=new Date(d*DAY);return Math.round(Date.UTC(x.getUTCFullYear(),x.getUTCMonth()+n,1)/DAY);};
+const fmt=d=>{const x=new Date(d*DAY);return MON[x.getUTCMonth()]+' '+x.getUTCDate();};
+const uw=(u,n)=>u+(n===1?'':'s');
+const nameOf=h=>h.name||'Untitled';
+function onColor(hex){const n=parseInt(hex.slice(1),16),f=c=>{c/=255;return c<=.03928?c/12.92:((c+.055)/1.055)**2.4;};const L=.2126*f(n>>16&255)+.7152*f(n>>8&255)+.0722*f(n&255);return L>.2?'#14161f':'#ffffff';}
+function graphemes(v,n){try{return [...new Intl.Segmenter(undefined,{granularity:'grapheme'}).segment(v)].slice(0,n).map(s=>s.segment).join('');}catch(e){return Array.from(v).slice(0,n).join('');}}
+const vis=(h)=>h.photo?`<img src="${esc(h.photo)}" alt="" draggable="false">`:`<span class="glyph">${esc(h.icon)}</span>`;
+function presetImage(ic,c){
+  const z=320,cv=document.createElement('canvas');cv.width=cv.height=z;const x=cv.getContext('2d');
+  const g=x.createLinearGradient(0,0,z,z);g.addColorStop(0,c);g.addColorStop(1,'#14201a');x.fillStyle=g;x.fillRect(0,0,z,z);
+  x.font='170px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif';x.textAlign='center';x.textBaseline='middle';x.fillText(ic,z/2,z/2+12);
+  return cv.toDataURL('image/jpeg',.86);
+}
+function readDataURL(file){return new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(String(r.result||''));r.onerror=()=>rej(0);r.readAsDataURL(file);});}
+function loadImg(src){return new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=()=>rej(0);i.src=src;});}
+async function shrinkImage(file,size){
+  let src=null;
+  if(window.createImageBitmap){try{src=await createImageBitmap(file);}catch(e){src=null;}}
+  if(!src)src=await loadImg(await readDataURL(file));
+  const w=src.width||src.naturalWidth,h=src.height||src.naturalHeight,sz=Math.min(w,h);if(!sz)throw 0;
+  const c=document.createElement('canvas');c.width=c.height=size;
+  c.getContext('2d').drawImage(src,(w-sz)/2,(h-sz)/2,sz,sz,0,0,size,size);
+  if(src.close)src.close();
+  let q=.82,out=c.toDataURL('image/jpeg',q);while(out.length>95000&&q>.4){q-=.1;out=c.toDataURL('image/jpeg',q);}
+  if(!okImg(out))throw 0;return out;
+}
+function takePhoto(file){
+  const sh=ui.sheet;if(!sh||!file||!['edit','profile'].includes(sh.kind))return;
+  if(file.type&&!/^image\//.test(file.type)){sh.photoErr="That file isn't a photo.";return renderSheet();}
+  const prof=sh.kind==='profile';
+  sh.photoBusy='load';sh.photoErr='';sh.photoNote='';renderSheet();
+  shrinkImage(file,prof?320:480).then(async u=>{
+    if(ui.sheet!==sh)return;sh.photoBusy='check';renderSheet();
+    const v=await photoCheck(u);if(ui.sheet!==sh)return;sh.photoBusy=false;
+    if(v==='bad')sh.photoErr="That photo can't be used here. Please pick a different one.";
+    else if(v==='ok'){sh.draft.photo=u;sh.draft.photoOk=true;}
+    else if(prof)sh.photoErr="Profile pictures need a quick safety check, and it couldn't run right now. Try again in a moment.";
+    else{sh.draft.photo=u;sh.draft.photoOk=false;sh.photoNote="This photo couldn't be safety-checked, so only you will see it.";}
+    renderSheet();
+  }).catch(()=>{if(ui.sheet!==sh)return;sh.photoBusy=false;sh.photoErr="Couldn't read that photo. Try a different one, or take a screenshot of it and use that.";renderSheet();});
+}
+/* ---------- Safety ---------- */
+const BAD=(()=>{try{return JSON.parse(atob('eyJzIjogWyJmdWNrIiwgImZ1ayIsICJzaGl0IiwgImN1bnQiLCAiYml0Y2giLCAibmlnZ2VyIiwgIm5pZ2dhIiwgImZhZ2dvdCIsICJ3aG9yZSIsICJiYXN0YXJkIiwgImFzc2hvbGUiLCAiYXNob2xlIiwgIm1vdGhlcmYiLCAicmV0YXJkIiwgImtpa2UiLCAiZGlja2hlYWQiLCAiY29ja3N1Y2siLCAiamFja2FzcyIsICJkdW1iYXNzIiwgImJ1bGxzaGl0Il0sICJ3IjogWyJhc3MiLCAiYXJzZSIsICJkaWNrIiwgImNvY2siLCAicHVzc3kiLCAic2x1dCIsICJmYWciLCAidHdhdCIsICJ3YW5rIiwgIndhbmtlciIsICJjdW0iLCAidGl0cyIsICJwb3JuIiwgInJhcGUiLCAiZHlrZSIsICJjaGluayIsICJzcGljIiwgImdvb2siLCAiaml6eiIsICJwcmljayIsICJib2xsb2NrcyIsICJwaXNzIiwgImZjayIsICJmayIsICJzdGZ1IiwgInd0ZiIsICJtaWxmIiwgIm5hemkiLCAiaG9lIiwgInRob3QiXX0='));}catch(e){return {s:[],w:[]};}})();
+const LEET={'0':'o','1':'i','3':'e','4':'a','5':'s','7':'t','@':'a','$':'s','!':'i','|':'l'};
+const squash=w=>w.replace(/(.)\1+/g,'$1');
+function hasBad(t){
+  for(const raw of String(t||'').toLowerCase().split(/\s+/)){
+    const w=raw.replace(/[013457@$!|]/g,c=>LEET[c]).replace(/[^a-z]/g,'');if(!w)continue;
+    const q=squash(w);
+    if(BAD.s.some(b=>w.includes(b)||q.includes(squash(b))))return true;
+    if(BAD.w.includes(w)||BAD.w.includes(q))return true;
+  }
+  return false;
+}
+const maskBad=t=>hasBad(t)?String(t).split(/(\s+)/).map(x=>hasBad(x)?x.replace(/\S/g,'•'):x).join(''):String(t||'');
+function dataBlob(u){const [h,b]=u.split(',');const bin=atob(b),a=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)a[i]=bin.charCodeAt(i);return new Blob([a],{type:h.slice(5,h.indexOf(';'))});}
+async function photoCheck(u){
+  if(!ui.sample||!ui.sampleImg)return 'unchecked';
+  try{
+    const r=await ui.sample.json('You are checking a photo someone wants to use in a habit-tracking app used by teenagers and adults. Decide if it is fine to show there. Not fine: nudity or sexual content, graphic violence or gore, self-harm, hate symbols, drug use, or anything that targets or humiliates a real person. Ordinary photos of people, food, pets, places, books, sport, art, memes and screenshots are fine. Reply with only JSON: {"ok": true} or {"ok": false}.',{images:[dataBlob(u)],modelTier:'quick'});
+    return r&&r.ok===true?'ok':r&&r.ok===false?'bad':'unchecked';
+  }catch(e){return e&&e.code==='refused'?'bad':'unchecked';}
+}
+const pasteBox=id=>`<div class="paste-box" id="${id}" contenteditable="true" role="textbox" aria-label="Paste a copied photo here" data-ph="Or paste a copied photo here"></div>`;
+const busyHTML=sh=>`<span class="pb-empty"><b>${sh.photoBusy==='check'?'Checking photo…':'Adding photo…'}</b></span>`;
+const nativeFile=id=>`<label class="hint native">Photo box not opening? <input type="file" class="native-file" id="${id}" accept="image/*"></label>`;
+
+/* ---------- State ---------- */
+let S={habits:{},settings:{...DEF},social:{following:[]}}, cacheMode='local', lastT=0;
+const store={mode:'connecting',ready:false,col:null,unsub:null,why:''};
+const W={pending:new Map(),inflight:new Set(),timers:new Map(),retry:new Map()};
+const ui={tab:'mine',reorder:false,showHidden:false,sheet:null,lastFocus:null,dl:null,hadCache:false};
+const social={db:null,user:null,uid:null,can:null,blocked:false,profiles:{},pReady:false,ownKnown:new Map(),ownReady:false,streaks:{},subs:new Map(),peek:{},names:{},avatars:{},leaving:false};
+try{if(localStorage.getItem(TABKEY)==='friends')ui.tab='friends';}catch(e){}
+const today=()=>{const n=new Date(Date.now()-S.settings.rollover*36e5);return Math.round(Date.UTC(n.getFullYear(),n.getMonth(),n.getDate())/DAY);};
+const weekStartOf=d=>d-((dow(d)-S.settings.weekStart+7)%7);
+
+function normSettings(o){
+  o=o&&typeof o==='object'?o:{}; const s={...DEF};
+  if(typeof o.theme==='string'&&has(THEMES,o.theme)) s.theme=o.theme; else if(o.theme==='light') s.theme='moss';
+  if(o.weekStart===0||o.weekStart===1) s.weekStart=o.weekStart;
+  if(Number.isInteger(o.rollover)&&o.rollover>=0&&o.rollover<=5) s.rollover=o.rollover;
+  if(['grid','list','compact'].includes(o.layout)) s.layout=o.layout; else if(o.density==='compact') s.layout='compact';
+  if(['manual','streak','name','due'].includes(o.sort)) s.sort=o.sort;
+  if(typeof o.remindAt==='string'&&/^([01]\d|2[0-3]):[0-5]\d$/.test(o.remindAt)) s.remindAt=o.remindAt;
+  for(const k of ['groups','hideDone','celebrate','remind']) if(typeof o[k]==='boolean') s[k]=o[k];
+  return s;
+}
+function normSocial(o){const f=o&&Array.isArray(o.following)?o.following:[];return {following:[...new Set(f.filter(x=>typeof x==='string'&&SEG.test(x)))].slice(0,60)};}
+function normProfile(d){if(!d||typeof d!=='object')return null;return {name:maskBad(String(d.name||'').slice(0,40)),photo:okImg(d.photo),bio:maskBad(String(d.bio||'').slice(0,140)),private:!!d.private,streaks:clamp(d.streaks|0,0,999),joined:Number.isFinite(d.joined)?d.joined:0};}
+function normHabit(h){
+  const s=h.sched&&typeof h.sched==='object'?h.sched:{};
+  const types=SCHED.map(x=>x[0]);
+  const o={id:String(h.id),name:String(h.name??'').slice(0,60),icon:String(h.icon||'•').slice(0,16),photo:okImg(h.photo),photoOk:!!h.photoOk,color:HEX.test(h.color)?h.color.toLowerCase():COLORS[0],
+    sched:{type:types.includes(s.type)?s.type:'daily',days:Array.isArray(s.days)?[...new Set(s.days.filter(d=>Number.isInteger(d)&&d>=0&&d<7))].sort():[1,3,5],every:clamp((s.every|0)||2,1,60),times:clamp((s.times|0)||3,1,31)},
+    goal:clamp((h.goal|0)||1,1,999),unit:String(h.unit||'').slice(0,20),start:DATE.test(h.start)?h.start:keyOf(today()),freezes:clamp(h.freezes|0,0,9),
+    group:String(h.group||'').slice(0,30),note:String(h.note||'').slice(0,300),archived:!!h.archived,hidden:!!h.hidden,order:Number.isFinite(h.order)?h.order:0,created:Number.isFinite(h.created)?h.created:Date.now(),log:{},skip:{}};
+  if(h.log&&typeof h.log==='object') for(const [k,v] of Object.entries(h.log)) if(DATE.test(k)&&v>0) o.log[k]=Math.min(9999,Math.floor(v));
+  if(h.skip&&typeof h.skip==='object') for(const k of Object.keys(h.skip)) if(DATE.test(k)&&h.skip[k]) o.skip[k]=1;
+  return o;
+}
+function newHabit(p={}){
+  return normHabit({id:'h'+Date.now().toString(36)+Math.random().toString(36).slice(2,7),name:'',icon:'🌱',color:COLORS[0],goal:1,unit:'',start:keyOf(today()),freezes:0,group:'',note:'',order:0,...p,sched:{type:'daily',days:[1,2,3,4,5],every:2,times:3,...(p.sched||{})},log:{},skip:{}});
+}
+
+/* ---------- Streak engine ---------- */
+function evaluate(h,t=today()){
+  const goal=h.goal,type=h.sched.type,log=h.log,skip=h.skip,s=dnOf(h.start),st=new Map(),used={};
+  const fwin=d=>type==='perMonth'?keyOf(d).slice(0,4):keyOf(d).slice(0,7);
+  const canFreeze=d=>(used[fwin(d)]||0)<h.freezes, useFreeze=d=>{const k=fwin(d);used[k]=(used[k]||0)+1;};
+  let cur=0,best=0,hit=0,miss=0,total=0;
+  const r={st};
+  if(type==='perWeek'||type==='perMonth'){
+    const wk=type==='perWeek',times=h.sched.times;
+    let p=wk?weekStartOf(s):monthStartOf(s);
+    while(p<=t){
+      const pe=wk?p+6:monthEndOf(p),a=Math.max(p,s);let c=0,sk=0;
+      for(let d=a;d<=Math.min(pe,t);d++){const k=keyOf(d),n=log[k]||0;
+        if(n>=goal){c++;total++;st.set(d,'done');}else if(skip[k]){sk++;st.set(d,'skip');}else st.set(d,n>0?'partial':'open');}
+      const target=Math.min(times,pe-a+1-sk),isCur=pe>=t;
+      if(target<=0){}
+      else if(c>=target){cur++;hit++;best=Math.max(best,cur);}
+      else if(isCur){}
+      else if(cur>0&&canFreeze(pe)){useFreeze(pe);}
+      else{miss++;cur=0;}
+      if(isCur) r.period={count:c,target:Math.max(0,target),start:p,end:pe};
+      p=pe+1;
+    }
+    r.unit=wk?'week':'month';
+    r.dueToday=!!(r.period&&r.period.count<r.period.target);
+  }else{
+    const N=h.sched.every,days=h.sched.days;let anchor=s-1;
+    const req=d=>type==='daily'?true:type==='weekdays'?days.includes(dow(d)):d-anchor>=N;
+    for(let d=s;d<=t;d++){const k=keyOf(d),n=log[k]||0;
+      if(n>=goal){cur++;total++;hit++;best=Math.max(best,cur);anchor=d;st.set(d,'done');continue;}
+      if(skip[k]){st.set(d,'skip');if(type==='interval')anchor++;continue;}
+      if(!req(d)){st.set(d,n>0?'partial':'off');continue;}
+      if(d===t){st.set(d,n>0?'partial':'due');r.dueToday=true;continue;}
+      if(cur>0&&canFreeze(d)){useFreeze(d);st.set(d,'frozen');if(type==='interval')anchor=d;continue;}
+      st.set(d,'missed');miss++;cur=0;if(type==='interval')anchor=d;
+    }
+    r.unit='day';
+    if(type==='interval') r.next=Math.max(anchor+N,t+1);
+    else if(type==='weekdays'&&days.length){let d=t+1;while(!days.includes(dow(d)))d++;r.next=d;}
+  }
+  r.cur=cur;r.best=best;r.total=total;r.rate=hit+miss?hit/(hit+miss):null;
+  r.doneToday=(log[keyOf(t)]||0)>=goal;
+  r.freezesLeft=Math.max(0,h.freezes-(used[fwin(t)]||0));
+  return r;
+}
+function chainLinks(states){
+  const L=x=>x==='done'||x==='frozen'||x==='skip', ch=states.map(L);
+  states.forEach((x,i)=>{if(x!=='off')return;let a=i-1;while(a>=0&&states[a]==='off')a--;let b=i+1;while(b<states.length&&states[b]==='off')b++;if(a>=0&&b<states.length&&L(states[a])&&L(states[b]))ch[i]=true;});
+  return ch.map((c,i)=>i>0&&c&&ch[i-1]);
+}
+
+/* ---------- Text ---------- */
+function schedText(h){
+  const s=h.sched,ws=S.settings.weekStart;
+  switch(s.type){
+    case 'weekdays':{const j=s.days.join();if(s.days.length===7)return 'Every day';if(j==='1,2,3,4,5')return 'Weekdays';if(j==='0,6')return 'Weekends';
+      return [0,1,2,3,4,5,6].map(i=>(ws+i)%7).filter(i=>s.days.includes(i)).map(i=>DN[i]).join(', ')||'No days picked';}
+    case 'interval':return s.every===1?'Every day':`Every ${s.every} days`;
+    case 'perWeek':return `${s.times}× a week`;
+    case 'perMonth':return `${s.times}× a month`;
+    default:return 'Every day';
+  }
+}
+const goalText=h=>h.goal>1?` · ${h.goal} ${h.unit||'times'} a day`:'';
+function relDay(d,t){return d===t+1?'tomorrow':d-t<7?DNL[dow(d)]:fmt(d);}
+function statusText(h,e,t){
+  const k=keyOf(t),n=h.log[k]||0;
+  if(e.period){const p=e.period;if(!p.target)return `Rest ${e.unit}`;if(p.count>=p.target)return `Done for the ${e.unit}`;return `${p.count} of ${p.target} this ${e.unit}`;}
+  if(h.skip[k])return 'Rest day';
+  if(n>=h.goal)return n>1&&h.goal===1?`Done ×${n} today`:'Done today';
+  if(n>0)return `${n} of ${h.goal} ${h.unit||'times'}`;
+  if(e.dueToday)return e.cur?'Due today':'Start today';
+  if(e.next!=null)return 'Next: '+relDay(e.next,t);
+  return 'Not due today';
+}
+const displayName=id=>(social.profiles[id]&&social.profiles[id].name)||social.names[id]||(id===social.uid?'You':'Someone');
+function avatarHTML(id,cls){
+  const p=social.profiles[id],src=(p&&p.photo)||social.avatars[id];
+  if(src)return `<span class="av ${cls||''}"><img src="${esc(src)}" alt=""></span>`;
+  return `<span class="av ${cls||''}" aria-hidden="true">${esc(graphemes(displayName(id),1).toUpperCase())}</span>`;
+}
+
+/* ---------- My streaks ---------- */
+function sorted(active,evs){
+  const s=S.settings.sort,dk=h=>{const e=evs.get(h.id);return e.dueToday&&!e.doneToday?0:e.doneToday?1:2;};
+  return [...active].sort((a,b)=>s==='streak'?evs.get(b.id).cur-evs.get(a.id).cur||a.order-b.order:s==='name'?nameOf(a).localeCompare(nameOf(b)):s==='due'?dk(a)-dk(b)||a.order-b.order:a.order-b.order);
+}
+function groupList(arr){
+  const m=new Map();
+  for(const h of arr){const g=S.settings.groups?h.group.trim():'';if(!m.has(g))m.set(g,[]);m.get(g).push(h);}
+  return [...m.entries()].sort((a,b)=>a[0]===''?-1:b[0]===''?1:0);
+}
+function stripHTML(h,e,t,sm){
+  const ws=weekStartOf(t),s=dnOf(h.start),states=[];
+  for(let i=0;i<7;i++){const d=ws+i;states.push(d>t?'future':d<s?'pre':e.st.get(d)||'off');}
+  const links=chainLinks(states);
+  return `<span class="strip${sm?' sm':''}" aria-hidden="true">${states.map((x,i)=>{const d=ws+i;return `<span class="d s-${x}${links[i]?' jl':''}${d===t?' now':''}"><i></i><em>${DL[dow(d)]}</em></span>`;}).join('')}</span>`;
+}
+const hcStyle=h=>`--hc:${h.color};--hc-on:${onColor(h.color)}`;
+function tapLabel(h,e,meta){return `${nameOf(h)}: ${e.cur} ${uw(e.unit,e.cur)} streak, ${meta}. Double-tap to add one. Tap to open.`;}
+function tileHTML(h,e,t){
+  const k=keyOf(t),n=h.log[k]||0,done=n>=h.goal,rest=!!h.skip[k],meta=statusText(h,e,t);
+  const badge=done?`<span class="badge on">${I.check}${n>1?`×${n}`:''}</span>`:h.goal>1&&n?`<span class="badge">${n}/${h.goal}</span>`:'';
+  return `<button class="tile${done?' is-done':''}" data-act="card" data-id="${h.id}" data-card="${h.id}" style="${hcStyle(h)}" aria-label="${esc(tapLabel(h,e,meta))}">
+    <span class="media">${vis(h)}<span class="tile-streak"><b>${e.cur}</b><small>${uw(e.unit,e.cur)}</small></span>${badge}</span>
+    <span class="tile-body"><span class="nm">${esc(nameOf(h))}</span><span class="meta">${esc(meta)}</span></span></button>`;
+}
+function cardHTML(h,e,t,demo){
+  const k=keyOf(t),n=h.log[k]||0,done=n>=h.goal,rest=!!h.skip[k],multi=h.goal>1,nm=nameOf(h);
+  const off=!e.dueToday&&!done&&!rest&&!e.period,meta=schedText(h)+' · '+statusText(h,e,t),static_=demo||ui.reorder;
+  const strip=S.settings.layout==='compact'?'':stripHTML(h,e,t);
+  const right=ui.reorder&&!demo
+    ?`<div class="mv"><button class="icon-btn sm" data-act="up" data-id="${h.id}" aria-label="Move ${esc(nm)} up">${I.up}</button><button class="icon-btn sm" data-act="down" data-id="${h.id}" aria-label="Move ${esc(nm)} down">${I.down}</button></div>`
+    :`<span class="streak${e.cur>0&&!done&&e.dueToday?' pending':''}"><b>${e.cur}</b><small>${uw(e.unit,e.cur)}</small></span><span class="today${done?' on':''}${multi?' multi':''}${rest&&!done?' rest':''}${off?' off':''}" style="--p:${Math.min(1,n/h.goal)}" aria-hidden="true">${multi?`<span>${n}<small>/${h.goal}</small></span>`:rest&&!done?I.moon:n>1?`<span>×${n}</span>`:I.check}</span>`;
+  const tag=static_?'div':'button';
+  return `<${tag} class="card${done?' is-done':''}" data-card="${h.id}" style="${hcStyle(h)}"${static_?'':` data-act="card" data-id="${h.id}" aria-label="${esc(tapLabel(h,e,meta))}"`}><span class="thumb">${vis(h)}</span><span class="txt"><span class="nm">${esc(nm)}</span><span class="meta">${esc(meta)}</span>${strip}</span>${right}</${tag}>`;
+}
+function emptyHTML(){
+  return `<div class="empty-card"><h2>No streaks yet</h2><p>Add a photo and a title, then double-tap it whenever you do it.</p><button class="btn primary" data-act="new">New streak</button>${store.mode==='connecting'&&!ui.hadCache?'<p class="hint">Looking for streaks you saved before…</p>':''}</div>`;
+}
+const REMKEY='unbroken:reminded';
+const fmtTime=v=>{const [h,m]=v.split(':').map(Number);return `${h%12||12}:${pad(m)} ${h<12?'AM':'PM'}`;};
+const pastRemind=()=>{const [h,m]=S.settings.remindAt.split(':').map(Number),n=new Date();return n.getHours()*60+n.getMinutes()>=h*60+m;};
+function reminderHTML(active,evs,t){
+  if(!S.settings.remind||!pastRemind())return '';
+  try{if(localStorage.getItem(REMKEY)===keyOf(t))return '';}catch(e){}
+  const left=active.filter(h=>{const e=evs.get(h.id);return e.dueToday&&!e.doneToday;}).length;
+  if(!left)return '';
+  return `<div class="reminder" role="status">${sv('<path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/>')}<span>${left} ${left===1?'streak is':'streaks are'} still to do today.</span><button class="link" data-act="remindOk">Got it</button></div>`;
+}
+function renderMine(t){
+  const active=Object.values(S.habits).filter(h=>!h.archived);
+  const evs=new Map(active.map(h=>[h.id,evaluate(h,t)]));
+  if(ui.reorder&&active.length<2) ui.reorder=false;
+  const x=new Date(t*DAY),date=`${DNL[x.getUTCDay()]}, ${MONL[x.getUTCMonth()]} ${x.getUTCDate()}`;
+  const sum=$('#summary');sum.hidden=false;
+  if(!active.length) sum.innerHTML=`<p class="eyebrow">${esc(date)}</p><h2 class="headline">Keep the chain going</h2>`;
+  else{
+    const rel=sorted(active,evs).filter(h=>{const e=evs.get(h.id);return e.dueToday||e.doneToday;});
+    const dn=rel.filter(h=>evs.get(h.id).doneToday).length;
+    const head=!rel.length?'Nothing due today':dn===rel.length?'All done today':`${dn} of ${rel.length} done today`;
+    sum.innerHTML=`<p class="eyebrow">${esc(date)}</p><h2 class="headline">${esc(head)}</h2>`;
+  }
+  const list=$('#list'),empty=$('#empty');
+  if(!active.length){list.innerHTML='';empty.hidden=false;empty.innerHTML=emptyHTML(t);}
+  else{
+    empty.hidden=true;empty.innerHTML='';
+    let arr=ui.reorder?[...active].sort((a,b)=>a.order-b.order):sorted(active,evs),hidden=0;
+    const doneNow=h=>{const e=evs.get(h.id);return e.doneToday||!!(e.period&&e.period.target&&e.period.count>=e.period.target);};
+    if(S.settings.hideDone&&!ui.reorder&&!ui.showHidden){const b=arr.length;arr=arr.filter(h=>!doneNow(h));hidden=b-arr.length;}
+    const grid=S.settings.layout==='grid'&&!ui.reorder;
+    let html=ui.reorder?'':reminderHTML(active,evs,t);
+    html+=ui.reorder?`<div class="reorder-bar"><span>Use the arrows to change the order.</span><button class="btn sm primary" data-act="reorder">Done</button></div>`:'';
+    html+=groupList(arr).map(([g,hs])=>`<section class="group">${g?`<h2 class="grp">${esc(g)}</h2>`:''}<div class="${grid?'grid':'cards'}">${hs.map(h=>grid?tileHTML(h,evs.get(h.id),t):cardHTML(h,evs.get(h.id),t)).join('')}</div></section>`).join('');
+    if(hidden) html+=`<p class="hidden-note">${arr.length?'':'All done for today. '}${hidden} finished ${hidden===1?'streak is':'streaks are'} hidden. <button class="link" data-act="showhidden">Show</button></p>`;
+    list.innerHTML=html;
+  }
+  $('#fab').hidden=ui.reorder;
+    $('#howto').textContent=ui.reorder?'':active.length?'Double-tap a streak to count it. Tap once to open it.':'';
+}
+
+/* ---------- Friends ---------- */
+function miniHTML(pid,h,t){
+  const e=evaluate(h,t);
+  return `<button class="mini" data-act="fopen" data-pid="${pid}" data-id="${h.id}" style="${hcStyle(h)}" aria-label="${esc(`${nameOf(h)}: ${e.cur} ${uw(e.unit,e.cur)}${e.doneToday?', done today':''}`)}"><span class="media">${vis(h)}<span class="tile-streak"><b>${e.cur}</b><small>${uw(e.unit,e.cur)}</small></span>${e.doneToday?`<span class="badge on">${I.check}</span>`:''}</span><span class="mini-t">${esc(nameOf(h))}</span></button>`;
+}
+const pubList=m=>Object.values(m||{}).sort((a,b)=>a.order-b.order);
+function followHTML(id,t){
+  const p=social.profiles[id],hs=social.streaks[id];
+  let body;
+  if(!social.pReady)body='<p class="muted-note">Loading…</p>';
+  else if(!p)body='<p class="muted-note">This person removed their profile.</p>';
+  else if(p.private)body='<p class="muted-note">This profile is private.</p>';
+  else if(!hs)body='<p class="muted-note">Loading…</p>';
+  else if(!Object.keys(hs).length)body='<p class="muted-note">No public streaks yet.</p>';
+  else body=`<div class="scroller">${pubList(hs).map(h=>miniHTML(id,h,t)).join('')}</div>`;
+  return `<div class="fblock"><button class="fhead" data-act="person" data-id="${id}">${avatarHTML(id)}<b>${esc(displayName(id))}</b>${p&&p.private?'<span class="pill">Private</span>':''}</button>${body}</div>`;
+}
+function personRow(id){
+  const p=social.profiles[id];
+  return `<div class="prow"><button class="pmain" data-act="person" data-id="${id}">${avatarHTML(id)}<span><b>${esc(displayName(id))}</b><small>${p.private?'Private profile':`${p.streaks} public ${p.streaks===1?'streak':'streaks'}`}</small></span></button><button class="btn sm" data-act="follow" data-id="${id}" aria-label="Add ${esc(displayName(id))}">Add</button></div>`;
+}
+function renderFriends(t){
+  $('#summary').hidden=true;$('#empty').hidden=true;$('#fab').hidden=true;
+  const list=$('#list');
+  if(!social.db){
+    list.innerHTML=`<section class="summary"><p class="eyebrow">Friends</p><h2 class="headline">Streaks are better with company</h2><p class="sub">Open this page in Claude while signed in to make a profile, add friends and see their streaks.</p></section>`;
+    $('#howto').textContent='';return;
+  }
+  const uid=social.uid,me=social.profiles[uid],fol=S.social.following.filter(id=>id!==uid);
+  const others=Object.keys(social.profiles).filter(id=>id!==uid&&!fol.includes(id)).sort((a,b)=>displayName(a).localeCompare(displayName(b)));
+  let html=`<section class="summary"><p class="eyebrow">Friends</p><h2 class="headline">${fol.length?`Following ${fol.length} ${fol.length===1?'person':'people'}`:'Streaks are better with company'}</h2></section>`;
+  if(social.blocked||social.can===false) html+=`<div class="notice">You can see everyone's public streaks, but your access to this page doesn't let you post your own. Ask the person who shared it with you for edit access.</div>`;
+  else if(me) html+=`<div class="me-card">${avatarHTML(uid,'av-lg')}<div class="me-t"><b>${esc(displayName(uid))}</b><span>${me.private?'Private. Nobody else sees your streaks.':`Public. ${me.streaks} ${me.streaks===1?'streak':'streaks'} visible to friends.`}</span></div><button class="btn sm" data-act="profileEdit">Edit</button></div>`;
+  else if(social.pReady) html+=`<div class="join"><div><h3>Make your profile</h3><p>Pick a name and a photo. People who use this page can add you and follow your streaks. You can make any streak, or your whole profile, private.</p></div><div><button class="btn primary" data-act="profileEdit">Make my profile</button></div></div>`;
+  html+='<h2 class="grp">Following</h2>';
+  html+=fol.length?fol.sort((a,b)=>displayName(a).localeCompare(displayName(b))).map(id=>followHTML(id,t)).join(''):'<p class="muted-note">Nobody yet. Add people below to follow their streaks.</p>';
+  html+='<h2 class="grp">People here</h2>';
+  html+=others.length?`<div class="set">${others.map(personRow).join('')}</div>`:`<p class="muted-note">${social.pReady?'Nobody else has made a profile yet. Share this page with friends so they can join.':'Loading people…'}</p>`;
+  list.innerHTML=html;
+  $('#howto').textContent='Tap a person to see their streaks. Private streaks never show here.';
+  resolveNames([uid,...fol,...others]);
+}
+async function resolveNames(ids){
+  const need=ids.filter(id=>!(social.profiles[id]&&social.profiles[id].name&&social.profiles[id].photo)&&!(id in social.names));
+  if(!social.user||!need.length)return;
+  need.forEach(id=>social.names[id]='');
+  try{const ps=await social.user.profiles(need);let ch=false;for(const id of need){const p=ps&&ps[id];if(!p)continue;if(p.name){social.names[id]=p.name;ch=true;}if(p.avatarUrl){social.avatars[id]=p.avatarUrl;ch=true;}}if(ch)renderSocial();}catch(e){}
+}
+function render(){
+  applyTheme();
+  const t=today();lastT=t;
+  $('#tabMine').setAttribute('aria-selected',String(ui.tab==='mine'));$('#tabFriends').setAttribute('aria-selected',String(ui.tab==='friends'));
+  if(ui.tab==='friends')renderFriends(t);else renderMine(t);
+  const mb=$('#btnMe');mb.hidden=!social.db;if(social.db){mb.innerHTML=avatarHTML(social.uid);resolveNames([social.uid]);}
+  const note=$('#storeNote');let msg,cls='';
+  if(store.mode==='cloud'&&store.ready){msg='Synced to your Claude account.';cls='ok';}
+  else if(store.mode!=='local') msg='Connecting to your account…';
+  else msg=store.why==='readonly'?"Saved in this browser only. Your access to this page doesn't include saving to your account.":store.why==='lost'?'Saved in this browser only. The connection to your account dropped. Reload to reconnect.':'Saved in this browser only. Open this page in Claude while signed in to sync across devices.';
+  note.className='foot '+cls;note.innerHTML=`<i></i><span>${esc(msg)}</span>`;
+}
+function renderSocial(){if(ui.tab==='friends')render();if(ui.sheet&&['person','fdetail'].includes(ui.sheet.kind))renderSheet();}
+function applyTheme(){
+  const r=document.documentElement,s=S.settings;
+  r.setAttribute('data-ui',has(THEMES,s.theme)?s.theme:'forest');
+  r.classList.toggle('compact',s.layout==='compact');
+}
+function notice(msg){const n=$('#notice');n.textContent=msg||'';n.hidden=!msg;}
+let tt;
+function toast(msg,undo,big){
+  const el=$('#toast');
+  el.innerHTML=`<span>${esc(msg)}</span>${undo?'<button type="button" id="undoBtn">Undo</button>':''}`;
+  el.classList.toggle('big',!!big);el.classList.add('show');clearTimeout(tt);
+  tt=setTimeout(()=>el.classList.remove('show'),undo?5000:2600);
+  if(undo) $('#undoBtn').onclick=()=>{el.classList.remove('show');undo();};
+}
+function fx(id,plus){
+  const c=document.querySelector(`[data-card="${CSS.escape(id)}"]`);if(!c)return;
+  c.classList.add('pop');setTimeout(()=>c.classList.remove('pop'),600);
+  if(plus){const b=document.createElement('span');b.className='burst';b.textContent='+1';(c.querySelector('.media')||c).appendChild(b);setTimeout(()=>b.remove(),850);}
+}
+
+/* ---------- Sheets ---------- */
+function detailHTML(h,ro,pid){
+  const t=today(),e=evaluate(h,t),k=keyOf(t),n=h.log[k]||0,done=n>=h.goal,rest=!!h.skip[k],nm=nameOf(h),u=h.unit||'times';
+  let line;
+  if(ro) line=statusText(h,e,t)+'.';
+  else if(e.period){const p=e.period,left=p.target-p.count;line=!p.target?`Rest ${e.unit}. The streak waits for you.`:left<=0?`Done for this ${e.unit}. The streak is safe.`:`${left} more this ${e.unit} to make it ${e.cur+1}.`;}
+  else if(done) line=n>1?`Done today, ${n} times.`:'Done for today.';
+  else if(rest) line='Rest day. The streak is paused, not broken.';
+  else if(e.dueToday) line=e.cur?`Check in today to make it ${e.cur+1}.`:'Check in today to start a streak.';
+  else line=e.next!=null?`Not due today. Next: ${relDay(e.next,t)}.`:'Not due today.';
+  const stats=[['Best',`${e.best} ${uw(e.unit,e.best)}`],['Hit rate',e.rate==null?'–':Math.round(e.rate*100)+'%'],['Days done',String(e.total)]];
+  if(h.freezes) stats.push(['Free misses left',`${e.freezesLeft} of ${h.freezes}`]);
+  else stats.push([`Total ${h.goal>1?u:'count'}`,String(Object.values(h.log).reduce((a,b)=>a+b,0))]);
+  const head=ro
+    ?`<div class="sh-head"><button class="icon-btn" data-act="back" aria-label="Back to ${esc(displayName(pid))}">${I.left}</button><div class="dh-t"><h2>${esc(nm)}</h2><p>${esc(displayName(pid))} · ${esc(schedText(h)+goalText(h))}</p></div><button class="icon-btn" data-act="close" aria-label="Close">${I.x}</button></div>`
+    :`<div class="sh-head" style="--hc:${h.color}"><div class="dh"><span class="ico-sm">${h.photo?`<img src="${esc(h.photo)}" alt="">`:esc(h.icon)}</span><div class="dh-t"><h2>${esc(nm)}</h2><p>${esc(schedText(h)+goalText(h))}</p></div></div><button class="icon-btn" data-act="close" aria-label="Close">${I.x}</button></div>`;
+  let visLine='';
+  if(!ro&&social.db&&social.profiles[social.uid]){const me=social.profiles[social.uid];visLine=`<p class="hint">${h.hidden?"Private. Friends can't see this streak.":me.private?"Your profile is private, so friends can't see this streak.":'Friends who add you can see this streak.'}</p>`;}
+  return `${head}<div class="detail" style="${hcStyle(h)}">
+    ${h.photo?`<div class="banner"><img src="${esc(h.photo)}" alt=""></div>`:''}
+    <div class="big"><span class="bignum${!done&&e.dueToday&&e.cur?' pending':''}">${e.cur}</span><span class="bigl">${uw(e.unit,e.cur)} in a row</span></div>
+    <p class="line">${esc(line)}</p>
+    ${ro?'':`<div class="todayctl"><span class="stepper big"><button data-act="dec" data-id="${h.id}" aria-label="One less today" ${n?'':'disabled'}>${I.minus}</button><output aria-live="polite">${n}<small> ${h.goal>1?`/ ${h.goal} ${esc(u)}`:'today'}</small></output><button data-act="inc" data-id="${h.id}" aria-label="One more today">${I.plus}</button></span><button class="btn" data-act="rest" data-id="${h.id}" aria-pressed="${rest}">${rest?'Resting today':'Rest day'}</button></div>`}
+    <div class="stats">${stats.map(([a,b])=>`<div><span>${esc(a)}</span><b>${esc(b)}</b></div>`).join('')}</div>
+    ${calHTML(h,e,ui.sheet.month,t,ro)}
+    ${!ro&&h.note?`<blockquote class="note">${esc(h.note)}</blockquote>`:''}
+    ${visLine}
+    ${ro?'':`<div class="actions"><button class="btn" data-act="edit" data-id="${h.id}">Edit streak</button><button class="btn ghost" data-act="archive" data-id="${h.id}">Archive</button></div>`}
+  </div>`;
+}
+function calHTML(h,e,m,t,ro){
+  const ws=S.settings.weekStart,me=monthEndOf(m),lead=(dow(m)-ws+7)%7,s=dnOf(h.start),cells=[];
+  for(let i=0;i<lead;i++)cells.push(null);for(let d=m;d<=me;d++)cells.push(d);while(cells.length%7)cells.push(null);
+  const stOf=d=>d==null?'blank':d>t?'future':d<s?'pre':e.st.get(d)||'off';
+  const words={done:'done',skip:'rest day',frozen:'free miss used',missed:'missed',due:'due today',off:'not scheduled',pre:'before the start',future:'coming up',open:'not done'};
+  let html='',dc=0;
+  for(let r=0;r<cells.length;r+=7){
+    const row=cells.slice(r,r+7),sts=row.map(stOf),ln=chainLinks(sts);
+    html+=row.map((d,i)=>{
+      if(d==null)return '<span class="cd blank"></span>';
+      const n=h.log[keyOf(d)]||0,st=sts[i],part=n>0&&n<h.goal;if(st==='done')dc++;
+      const lbl=`${fmt(d)}: ${part?`${n} of ${h.goal}`:words[st]||''}`,cls=`cd s-${st}${ln[i]?' jl':''}${d===t?' now':''}${part?' part':''}`,sty=part?` style="--p:${n/h.goal}"`:'';
+      return ro?`<span class="${cls}"${sty} role="img" aria-label="${esc(lbl)}">${new Date(d*DAY).getUTCDate()}</span>`
+        :`<button class="${cls}"${sty} data-act="day" data-d="${d}"${d>t?' disabled':''} aria-label="${esc(lbl)}">${new Date(d*DAY).getUTCDate()}</button>`;
+    }).join('');
+  }
+  const x=new Date(m*DAY);
+  return `<div class="cal"><div class="cal-head"><button class="icon-btn sm" data-act="mprev" aria-label="Previous month">${I.left}</button><h3>${MONL[x.getUTCMonth()]} ${x.getUTCFullYear()}<small>${dc} done</small></h3><button class="icon-btn sm" data-act="mnext" aria-label="Next month"${m>=monthStartOf(t)?' disabled':''}>${I.right}</button></div>
+    <div class="cal-dow" aria-hidden="true">${[0,1,2,3,4,5,6].map(i=>`<span>${DL[(ws+i)%7]}</span>`).join('')}</div>
+    <div class="cal-grid">${html}</div>
+    <div class="legend"><span><i class="lg s-done"></i>Done</span><span><i class="lg s-skip"></i>Rest day</span>${h.freezes?'<span><i class="lg s-frozen"></i>Free miss</span>':''}<span><i class="lg s-missed"></i>Missed</span></div>
+    ${ro?'':'<p class="hint">Tap a day to mark it done. Tap again for a rest day, and once more to clear it. Rest days never break a streak.</p>'}</div>`;
+}
+const stepper=(f,v,min,max)=>`<span class="stepper"><button type="button" data-act="step" data-f="${f}" data-d="-1" data-min="${min}" data-max="${max}" aria-label="Fewer"${v<=min?' disabled':''}>${I.minus}</button><output aria-live="polite">${v}</output><button type="button" data-act="step" data-f="${f}" data-d="1" data-min="${min}" data-max="${max}" aria-label="More"${v>=max?' disabled':''}>${I.plus}</button></span>`;
+function editorHTML(){
+  const sh=ui.sheet,E=sh.draft,sc=E.sched,ws=S.settings.weekStart,tk=keyOf(today());
+  const groups=[...new Set(Object.values(S.habits).map(h=>h.group.trim()).filter(Boolean))];
+  const customColor=!COLORS.includes(E.color);
+  let det='';
+  if(sc.type==='weekdays') det=`<div class="days" role="group" aria-label="Days">${[0,1,2,3,4,5,6].map(i=>(ws+i)%7).map(i=>`<button type="button" data-act="wday" data-v="${i}" aria-pressed="${sc.days.includes(i)}">${DN[i]}</button>`).join('')}</div><small class="err" id="daysErr" hidden>Pick at least one day.</small>`;
+  else if(sc.type==='interval') det=`<div class="row">Every ${stepper('every',sc.every,2,30)} days</div>`;
+  else if(sc.type==='perWeek') det=`<div class="row">${stepper('times',sc.times,1,7)} ${sc.times===1?'time':'times'} a week</div>`;
+  else if(sc.type==='perMonth') det=`<div class="row">${stepper('times',sc.times,1,31)} ${sc.times===1?'time':'times'} a month</div>`;
+  const unit=sc.type==='perWeek'?'week':sc.type==='perMonth'?'month':'day',logs=Object.keys(E.log).length;
+  const canShare=!!(social.db&&!social.blocked&&social.can!==false);
+  const main=[['daily','Every day'],['weekdays','Certain days'],['perWeek','Times a week']],other=[['interval','Every few days'],['perMonth','Times a month']];
+  const segBtn=([v,l])=>`<button type="button" data-act="stype" data-v="${v}" aria-pressed="${sc.type===v}">${l}</button>`;
+  const more=sh.more?`<div class="form more">
+    <div class="field"><span class="lab">Other schedules</span><div class="seg">${other.map(segBtn).join('')}</div></div>
+    <div class="field"><span class="lab">A day counts after</span><div class="row">${stepper('goal',E.goal,1,99)} ${E.goal===1?'double-tap':'double-taps'}</div>
+      ${E.goal>1?`<input id="f-unit" value="${esc(E.unit)}" maxlength="16" placeholder="What you count, like glasses or pages" autocomplete="off" aria-label="What you count">`:''}</div>
+    <div class="field"><span class="lab">Free misses</span><div class="row">${stepper('freezes',E.freezes,0,5)} per ${sc.type==='perMonth'?'year':'month'}</div>
+      <small class="hint">Covers a missed ${unit} so the streak survives.</small></div>
+    ${canShare?`<div class="field"><div class="switch-row"><span class="sl">Show to friends<small>People who add you can see this streak and its photo.</small></span><button type="button" class="tg" role="switch" aria-checked="${!E.hidden}" data-act="hideToggle" aria-label="Show to friends"></button></div></div>`:''}
+    <div class="field"><span class="lab">Color</span><div class="swatches">${COLORS.map(c=>`<button type="button" class="sw" style="--c:${c}" data-act="color" data-v="${c}" aria-pressed="${E.color===c}" aria-label="Color ${c}"></button>`).join('')}<label class="sw custom${customColor?' sel':''}" style="--c:${E.color}" title="Pick any color"><input type="color" id="f-color" value="${E.color}" aria-label="Pick any color"></label></div></div>
+    <div class="field"><span class="lab">Icon when there's no photo</span><div class="icons">${ICONS.map(i=>`<button type="button" class="ib" data-act="icon" data-v="${esc(i)}" aria-pressed="${E.icon===i}" aria-label="Icon ${esc(i)}">${i}</button>`).join('')}</div>
+      <label class="inline" for="f-icon">Or type your own <input id="f-icon" value="${ICONS.includes(E.icon)?'':esc(E.icon)}" maxlength="12" placeholder="Aa" autocomplete="off"></label></div>
+    <div class="field"><label class="lab" for="f-group">Group</label><input id="f-group" list="grp" value="${esc(E.group)}" maxlength="30" placeholder="Morning, Health, Work…" autocomplete="off"><datalist id="grp">${groups.map(g=>`<option value="${esc(g)}"></option>`).join('')}</datalist></div>
+    <div class="field"><label class="lab" for="f-start">Counting from</label><input type="date" id="f-start" value="${esc(E.start)}" max="${tk}"></div>
+    <div class="field"><label class="lab" for="f-note">Note to self</label><textarea id="f-note" rows="2" maxlength="200" placeholder="Only you see this">${esc(E.note)}</textarea></div>
+  </div>`:'';
+  return `<div class="sh-head"><h2>${sh.isNew?'New streak':'Edit streak'}</h2><button class="icon-btn" data-act="close" aria-label="Close">${I.x}</button></div>
+  <div class="form">
+    <div class="field"><label class="photo-big${E.photo?' has':''}" style="--hc:${E.color}">${sh.photoBusy?busyHTML(sh):E.photo?`<img src="${esc(E.photo)}" alt="">`:`<span class="pb-empty"><span class="pb-glyph">${esc(E.icon)}</span><small>Tap to use your own photo</small></span>`}<input type="file" id="f-photo" accept="image/*" aria-label="${E.photo?'Change photo':'Add a photo'}"></label>
+      ${E.photo?'<div class="row"><span class="hint">Tap the photo to change it.</span><button type="button" class="link" data-act="photoClear">Remove</button></div>':pasteBox('f-paste')+nativeFile('f-photo2')}${sh.photoNote?`<small class="hint">${esc(sh.photoNote)}</small>`:''}</div>
+    <div class="field"><span class="lab">Or pick a picture</span><div class="presets" role="group" aria-label="Preset pictures">${PRESETS.map(([ic,c],i)=>`<button type="button" class="preset" style="--hc:${c}" data-act="preset" data-i="${i}" aria-pressed="${!E.photo&&E.icon===ic&&E.color===c}" aria-label="Picture ${ic}">${ic}</button>`).join('')}</div>
+      ${sh.photoErr?`<small class="err">${esc(sh.photoErr)}</small>`:''}</div>
+    <div class="field"><label class="lab" for="f-name">Title</label><input id="f-name" value="${esc(E.name)}" maxlength="40" placeholder="Read 20 pages" autocomplete="off"><small class="err" id="nameErr" hidden>Give it a title.</small></div>
+    <div class="field"><span class="lab">How often</span><div class="seg">${main.map(segBtn).join('')}${other.filter(([v])=>v===sc.type).map(segBtn).join('')}</div>${det}</div>
+    <div class="actions"><button class="btn primary" data-act="save">${sh.isNew?'Add streak':'Save'}</button><button class="btn ghost" data-act="cancel">Cancel</button></div>
+    <button type="button" class="more-btn" data-act="more" aria-expanded="${!!sh.more}">${sh.more?'Fewer options':'More options'}${sh.more?I.up:I.down}</button>
+    ${more}
+    ${sh.isNew?'':`<div class="danger">${sh.confirmDel?`<p>Delete ${esc(nameOf(E))} and its ${logs} ${logs===1?'check-in':'check-ins'}?</p><div class="row"><button class="btn danger" data-act="delyes">Delete</button><button class="btn ghost" data-act="delno">Keep it</button></div>`:`<div><button class="btn ghost danger-text" data-act="del">Delete streak</button></div>`}</div>`}
+  </div>`;
+}
+function profileHTML(){
+  const sh=ui.sheet,d=sh.draft,me=social.profiles[social.uid];
+  return `<div class="sh-head"><h2>${me?'Your profile':'Make your profile'}</h2><button class="icon-btn" data-act="close" aria-label="Close">${I.x}</button></div>
+  <div class="form">
+    <div class="field"><label class="photo-big round${d.photo?' has':''}" style="--hc:var(--accent)">${sh.photoBusy?busyHTML(sh):d.photo?`<img src="${esc(d.photo)}" alt="">`:`<span class="pb-empty">${I.plus}<b>Profile picture</b><small>Tap to use your own photo</small></span>`}<input type="file" id="p-photo" accept="image/*" aria-label="${d.photo?'Change profile picture':'Add a profile picture'}"></label>
+      ${d.photo?'<div class="row" style="justify-content:center"><span class="hint">Tap the picture to change it.</span><button type="button" class="link" data-act="pphotoClear">Remove</button></div>':pasteBox('p-paste')+nativeFile('p-photo2')}</div>
+    <div class="field"><span class="lab">Or pick a picture</span><div class="presets" role="group" aria-label="Preset profile pictures">${AVATARS.map(([ic,c],i)=>`<button type="button" class="preset round" style="--hc:${c}" data-act="avatar" data-i="${i}" aria-label="Picture ${ic}">${ic}</button>`).join('')}</div>${sh.photoErr?`<small class="err">${esc(sh.photoErr)}</small>`:''}</div>
+    <div class="field"><label class="lab" for="p-name">Name</label><input id="p-name" value="${esc(d.name)}" maxlength="40" placeholder="What friends call you" autocomplete="off"><small class="err" id="pnameErr" hidden>Add a name so friends know it's you.</small></div>
+    <div class="field"><label class="lab" for="p-bio">About you</label><input id="p-bio" value="${esc(d.bio)}" maxlength="120" placeholder="Optional. One line, like what you're working on." autocomplete="off"></div>
+    <div class="field"><div class="switch-row"><span class="sl">Private profile<small>${d.private?'Nobody else sees your streaks. People can still see your name and photo.':'People who add you can see every streak you haven\'t made private.'}</small></span><button type="button" class="tg" role="switch" aria-checked="${!!d.private}" data-act="pprivate" aria-label="Private profile"></button></div></div>
+    <div class="actions"><button class="btn primary" data-act="psave">${me?'Save profile':'Make my profile'}</button><button class="btn ghost" data-act="close">Cancel</button></div>
+    ${me?`<div class="danger">${sh.confirmLeave?`<p>Remove your profile? Your streaks come off everyone's Friends page. They stay here for you.</p><div class="row"><button class="btn danger" data-act="pleaveYes">Remove profile</button><button class="btn ghost" data-act="pleaveNo">Keep it</button></div>`:`<div><button class="btn ghost danger-text" data-act="pleave">Remove my profile</button></div>`}</div>`:''}
+  </div>`;
+}
+function personHTML(id){
+  const p=social.profiles[id],fol=S.social.following.includes(id),t=today();
+  const hs=fol?social.streaks[id]:social.peek[id];
+  let body;
+  if(!p)body='<p class="muted-note">This person removed their profile.</p>';
+  else if(p.private)body='<p class="muted-note">This profile is private.</p>';
+  else if(!hs)body='<p class="muted-note">Loading streaks…</p>';
+  else if(!Object.keys(hs).length)body='<p class="muted-note">No public streaks yet.</p>';
+  else body=`<div class="grid">${pubList(hs).map(h=>{const e=evaluate(h,t);return `<button class="tile" data-act="fopen" data-pid="${id}" data-id="${h.id}" style="${hcStyle(h)}" aria-label="${esc(`${nameOf(h)}: ${e.cur} ${uw(e.unit,e.cur)}`)}"><span class="media">${vis(h)}<span class="tile-streak"><b>${e.cur}</b><small>${uw(e.unit,e.cur)}</small></span>${e.doneToday?`<span class="badge on">${I.check}</span>`:''}</span><span class="tile-body"><span class="nm">${esc(nameOf(h))}</span><span class="meta">${esc(statusText(h,e,t))}</span>${stripHTML(h,e,t,true)}</span></button>`;}).join('')}</div>`;
+  return `<div class="sh-head"><span></span><button class="icon-btn" data-act="close" aria-label="Close">${I.x}</button></div>
+  <div class="detail"><div class="phead">${avatarHTML(id,'av-xl')}<h3>${esc(displayName(id))}</h3>${p&&p.bio?`<p>${esc(p.bio)}</p>`:''}
+    <div class="row">${fol?`<button class="btn sm" data-act="unfollow" data-id="${id}">Remove</button>`:`<button class="btn sm primary" data-act="follow" data-id="${id}">Add</button>`}</div></div>${body}</div>`;
+}
+function settingsHTML(){
+  const s=S.settings,sh=ui.sheet,arch=Object.values(S.habits).filter(h=>h.archived),count=Object.keys(S.habits).length;
+  const seg=(k,opts,num)=>`<div class="seg">${opts.map(([v,l])=>`<button type="button" data-act="set" data-k="${k}" data-v="${v}"${num?' data-n="1"':''} aria-pressed="${String(s[k])===String(v)}">${l}</button>`).join('')}</div>`;
+  const tg=(k,l,hint)=>`<div class="srow"><span class="sl">${l}${hint?`<small>${hint}</small>`:''}</span><button type="button" class="tg" role="switch" aria-checked="${!!s[k]}" data-act="toggle" data-k="${k}" aria-label="${l}"></button></div>`;
+  const archRows=arch.length?arch.map(h=>`<div class="srow" style="--hc:${h.color}"><span class="arow"><span class="ico-sm">${h.photo?`<img src="${esc(h.photo)}" alt="">`:esc(h.icon)}</span>${esc(nameOf(h))}</span><span class="row">${sh.delArch===h.id
+      ?`<button class="btn sm danger" data-act="delArchYes" data-id="${h.id}">Delete for good</button><button class="btn sm ghost" data-act="delArchNo">Keep</button>`
+      :`<button class="btn sm" data-act="unarchive" data-id="${h.id}">Bring back</button><button class="btn sm ghost" data-act="delArch" data-id="${h.id}">Delete</button>`}</span></div>`).join('')
+    :'<div class="srow"><span class="sl muted">Nothing archived. Archive a streak to pause it without losing its history.</span></div>';
+  const rp=sh.restoreParsed,rn=rp?Object.keys(rp.habits).length:0;
+  return `<div class="sh-head"><h2>Settings</h2><button class="icon-btn" data-act="close" aria-label="Close">${I.x}</button></div>
+  <div class="settings">
+    <section><h3>Look</h3><div class="set">
+      <div class="srow col"><span class="sl">Theme</span><div class="themes">${Object.entries(THEMES).map(([k,[n,bg,sf,ac]])=>`<button type="button" class="theme-card" style="--t-bg:${bg};--t-surface:${sf};--t-acc:${ac}" data-act="set" data-k="theme" data-v="${k}" aria-pressed="${s.theme===k}"><span class="tc-prev" aria-hidden="true"></span><span>${n}</span></button>`).join('')}</div></div>
+      <div class="srow"><span class="sl">Streaks show as</span>${seg('layout',[['grid','Photo grid'],['list','List'],['compact','Compact']])}</div>
+    </div></section>
+    <section><h3>Reminder</h3><div class="set">
+      ${tg('remind','Daily reminder',s.remind?`Every day at ${fmtTime(s.remindAt)}, if a streak is still to do.`:'Off')}
+      ${s.remind?`<div class="srow"><label class="sl" for="s-remind">Remind me at</label><input type="time" id="s-remind" value="${s.remindAt}" style="width:auto"></div>`:''}
+      <div class="srow"><span class="sl muted" style="font-size:12.5px">For now the reminder shows inside Unbroken when you open it. Phone notifications arrive once Unbroken is installed as an app.</span></div>
+    </div></section>
+    <section><h3>Days</h3><div class="set">
+      <div class="srow"><span class="sl">Week starts on</span>${seg('weekStart',[[1,'Monday'],[0,'Sunday']],true)}</div>
+      <div class="srow"><label class="sl" for="s-roll">New day starts at<small>For night owls. A check-in before this time counts for the day before.</small></label><select id="s-roll">${[0,1,2,3,4,5].map(x=>`<option value="${x}"${s.rollover===x?' selected':''}>${x?x+':00 AM':'Midnight'}</option>`).join('')}</select></div>
+    </div></section>
+    <section><h3>Home screen</h3><div class="set">
+      <div class="srow"><label class="sl" for="s-sort">Sort streaks</label><select id="s-sort">${[['manual','My order'],['due','Still to do first'],['streak','Longest streak'],['name','Title']].map(([v,l])=>`<option value="${v}"${s.sort===v?' selected':''}>${l}</option>`).join('')}</select></div>
+      ${Object.values(S.habits).filter(h=>!h.archived).length>1?'<div class="srow"><span class="sl">Order of streaks</span><button type="button" class="btn sm" data-act="reorderStart">Change order</button></div>':''}
+      ${tg('groups','Show groups','Streaks with the same group sit together.')}
+      ${tg('hideDone','Hide what\'s done today')}
+      ${tg('celebrate','Celebrate milestones','A little fanfare at 7, 30, 100 days and more.')}
+    </div></section>
+    <section><h3>Archived</h3><div class="set">${archRows}</div></section>
+    <section><h3>Backup</h3><div class="set">
+      <div class="srow col"><span class="sl">Save a copy<small>Every streak, photo, check-in and setting, as one file or block of text.</small></span>
+        <div class="row">${ui.dl?'<button class="btn sm" data-act="saveFile">Save backup file</button>':''}<button class="btn sm" data-act="copy">Copy backup</button></div>
+        ${sh.copyText?`<textarea id="s-copy" readonly rows="3" aria-label="Backup text">${esc(sh.copyText)}</textarea><small class="hint">Select all of this text and copy it.</small>`:''}</div>
+      <div class="srow col"><span class="sl">Restore<small>Replaces the ${count} ${count===1?'streak':'streaks'} you have now.</small></span>
+        <div><label class="btn sm file">Choose a backup file<input type="file" id="s-file" accept=".json,application/json,text/plain"></label></div>
+        <textarea id="s-restore" rows="3" placeholder="Or paste backup text here">${esc(sh.restoreText||'')}</textarea>
+        ${sh.restoreErr?`<small class="err">${esc(sh.restoreErr)}</small>`:''}
+        ${rp?`<p>Replace your ${count} ${count===1?'streak':'streaks'} with the ${rn} in this backup?</p><div class="row"><button class="btn sm danger" data-act="restoreYes">Replace</button><button class="btn sm ghost" data-act="restoreNo">Cancel</button></div>`:`<div><button class="btn sm" data-act="restoreCheck">Restore</button></div>`}</div>
+    </div></section>
+  </div>`;
+}
+function focusSig(){
+  const a=document.activeElement;if(!a||!$('#sheetBody').contains(a))return null;
+  if(a.id)return '#'+CSS.escape(a.id);
+  const p=['act','v','k','f','d','id','pid'].filter(k=>a.dataset&&a.dataset[k]!=null).map(k=>`[data-${k}="${CSS.escape(a.dataset[k])}"]`);
+  return p.length?p.join(''):null;
+}
+function renderSheet(fresh){
+  const sh=ui.sheet;if(!sh)return;
+  const b=$('#sheetBody'),y=fresh?0:b.scrollTop,sig=fresh?null:focusSig(),sheet=$('.sheet');
+  if(sh.kind==='detail'){const h=S.habits[sh.id];if(!h||h.archived)return closeSheet();b.innerHTML=detailHTML(h);sheet.setAttribute('aria-label',nameOf(h));}
+  else if(sh.kind==='fdetail'){const m=(S.social.following.includes(sh.pid)?social.streaks[sh.pid]:social.peek[sh.pid])||{},h=m[sh.id];if(!h)return openSheet({kind:'person',id:sh.pid});b.innerHTML=detailHTML(h,true,sh.pid);sheet.setAttribute('aria-label',nameOf(h));}
+  else if(sh.kind==='person'){b.innerHTML=personHTML(sh.id);sheet.setAttribute('aria-label',displayName(sh.id));}
+  else if(sh.kind==='edit'){b.innerHTML=editorHTML();sheet.setAttribute('aria-label',sh.isNew?'New streak':'Edit streak');}
+  else if(sh.kind==='profile'){b.innerHTML=profileHTML();sheet.setAttribute('aria-label','Your profile');}
+  else{b.innerHTML=settingsHTML();sheet.setAttribute('aria-label','Settings');}
+  b.scrollTop=y;
+  if(sig){const el=b.querySelector(sig);if(el)el.focus({preventScroll:true});}
+}
+function openSheet(o){
+  if(!ui.sheet)ui.lastFocus=document.activeElement;
+  ui.sheet=o;renderSheet(true);$('#sheet').hidden=false;document.body.classList.add('locked');
+  requestAnimationFrame(()=>$('.sheet').focus({preventScroll:true}));
+}
+function closeSheet(){
+  ui.sheet=null;$('#sheet').hidden=true;document.body.classList.remove('locked');$('#sheetBody').innerHTML='';
+  const f=ui.lastFocus;ui.lastFocus=null;if(f&&document.contains(f))f.focus({preventScroll:true});
+}
+function refreshSheet(){if(ui.sheet&&ui.sheet.kind==='detail')renderSheet();}
+function openPerson(id){
+  openSheet({kind:'person',id});
+  if(!S.social.following.includes(id)&&!social.peek[id]&&social.db){
+    try{social.db.collection('people/'+id+'/streaks').get().then(snap=>{const m={};for(const d of snap.docs)if(SEG.test(d.id)){const x=normHabit({...clean(d.data()),id:d.id});x.name=maskBad(x.name);m[d.id]=x;}social.peek[id]=m;renderSocial();}).catch(()=>{social.peek[id]={};renderSocial();});}catch(e){}
+  }
+}
+
+/* ---------- Actions ---------- */
+function commit(h){S.habits[h.id]=h;persist(h.id,clean(h));render();refreshSheet();syncPublic();}
+function cheer(h,before){
+  const a=evaluate(h);if(a.cur<=before.cur)return '';
+  return S.settings.celebrate&&MILE[a.unit].includes(a.cur)?`${a.cur} ${uw(a.unit,a.cur)} in a row: ${nameOf(h)}`:'';
+}
+function addOne(id){
+  const h=S.habits[id];if(!h||h.archived)return;
+  const k=keyOf(today()),pn=h.log[k]||0,ps=!!h.skip[k],before=evaluate(h);
+  h.log[k]=pn+1;delete h.skip[k];commit(h);fx(id,true);
+  const n=h.log[k],nm=nameOf(h),big=cheer(h,before);
+  const undo=()=>{const x=S.habits[id];if(!x)return;if(pn)x.log[k]=pn;else delete x.log[k];if(ps)x.skip[k]=1;commit(x);};
+  toast(big||(n===h.goal?`${nm}: done for today`:h.goal>1?`${nm}: ${n} of ${h.goal} ${h.unit||'times'}`:`${nm}: ${n} today`),undo,!!big);
+}
+function adjust(id,dl){
+  const h=S.habits[id];if(!h)return;
+  const k=keyOf(today()),n=Math.max(0,(h.log[k]||0)+dl),before=evaluate(h);
+  if(n)h.log[k]=n;else delete h.log[k];if(dl>0)delete h.skip[k];
+  commit(h);const big=cheer(h,before);if(big)toast(big,null,true);
+}
+function toggleRest(id){
+  const h=S.habits[id];if(!h)return;const k=keyOf(today());
+  if(h.skip[k])delete h.skip[k];else{h.skip[k]=1;delete h.log[k];}
+  commit(h);
+}
+function cycleDay(id,d){
+  const h=S.habits[id];if(!h||d>today())return;
+  const k=keyOf(d),n=h.log[k]||0,before=evaluate(h);
+  if(n>=h.goal){delete h.log[k];h.skip[k]=1;}else if(h.skip[k])delete h.skip[k];else{h.log[k]=h.goal;delete h.skip[k];}
+  if(d<dnOf(h.start))h.start=k;
+  commit(h);const big=cheer(h,before);if(big)toast(big,null,true);
+}
+function archive(id,v){
+  const h=S.habits[id];if(!h)return;h.archived=v;commit(h);
+  if(v){if(ui.sheet&&ui.sheet.kind==='detail')closeSheet();toast(`Archived ${nameOf(h)}`,()=>archive(id,false));}
+  else if(ui.sheet&&ui.sheet.kind==='settings')renderSheet();
+}
+function removeHabit(id,fromSettings){
+  const h=S.habits[id];if(!h)return;const copy=clean(h);
+  delete S.habits[id];persist(id,null);syncPublic();
+  if(fromSettings){ui.sheet.delArch=null;renderSheet();}else closeSheet();
+  render();
+  toast(`Deleted ${nameOf(copy)}`,()=>{S.habits[id]=normHabit(copy);persist(id,clean(S.habits[id]));syncPublic();render();if(ui.sheet&&ui.sheet.kind==='settings')renderSheet();});
+}
+function move(id,dir){
+  const act=Object.values(S.habits).filter(h=>!h.archived).sort((a,b)=>a.order-b.order),h=S.habits[id];if(!h)return;
+  const peers=S.settings.groups?act.filter(x=>x.group.trim()===h.group.trim()):act,i=peers.indexOf(h),j=i+dir;
+  if(j<0||j>=peers.length)return;
+  const o=peers[j];
+  if(new Set(act.map(x=>x.order)).size<act.length) act.forEach((x,n)=>{if(x.order!==n+1){x.order=n+1;persist(x.id,clean(x));}});
+  [h.order,o.order]=[o.order,h.order];persist(h.id,clean(h));persist(o.id,clean(o));render();syncPublic();
+  const b=document.querySelector(`[data-act="${dir<0?'up':'down'}"][data-id="${CSS.escape(id)}"]`);if(b)b.focus({preventScroll:true});
+}
+function saveDraft(){
+  const sh=ui.sheet,E=sh.draft;E.name=E.name.trim();
+  if(!E.name||hasBad(E.name)){const er=$('#nameErr');er.textContent=E.name?'Please pick a different title.':'Give it a title.';er.hidden=false;$('#f-name').focus();return;}
+  if(E.sched.type==='weekdays'&&!E.sched.days.length){$('#daysErr').hidden=false;return;}
+  E.icon=(E.icon||'').trim()||'•';E.group=E.group.trim();E.unit=E.unit.trim();
+  if(!DATE.test(E.start)||dnOf(E.start)>today())E.start=keyOf(today());
+  if(sh.isNew)E.order=Math.max(0,...Object.values(S.habits).map(h=>h.order))+1;
+  const h=normHabit(E);commit(h);
+  if(sh.isNew){closeSheet();toast(`Added ${nameOf(h)}. Double-tap it to count it.`);fx(h.id);}
+  else openSheet({kind:'detail',id:h.id,month:monthStartOf(today())});
+}
+function setSetting(k,v){S.settings[k]=v;S.settings=normSettings(S.settings);persist('settings',{...S.settings});render();renderSheet();}
+function follow(id,on){
+  const f=S.social.following.filter(x=>x!==id);if(on)f.push(id);
+  S.social={following:f};persist('social',{...S.social});syncSubs();render();
+  if(ui.sheet&&ui.sheet.kind==='person')renderSheet();
+  toast(on?`Added ${displayName(id)}`:`Removed ${displayName(id)}`,()=>follow(id,!on));
+}
+function saveProfile(){
+  const d=ui.sheet.draft;d.name=d.name.trim();
+  if(!d.name||hasBad(d.name)||hasBad(d.bio)){const er=$('#pnameErr');er.textContent=!d.name?"Add a name so friends know it's you.":'Please keep your name and about line free of rude words.';er.hidden=false;$('#p-name').focus();return;}
+  const uid=social.uid,me=social.profiles[uid];
+  const body={name:d.name,photo:d.photoOk?okImg(d.photo):'',bio:d.bio.trim().slice(0,120),private:!!d.private,joined:me&&me.joined?me.joined:Date.now(),streaks:me?me.streaks:0};
+  social.leaving=false;social.profiles[uid]=normProfile(body);
+  pubWrite('people/'+uid,body);syncPublic();closeSheet();render();
+  toast(me?'Profile saved':'Profile made. Friends can add you now.');
+}
+function leaveProfile(){
+  const uid=social.uid;social.leaving=true;delete social.profiles[uid];
+  pubWrite('people/'+uid,null);doSync();closeSheet();render();toast('Profile removed');
+}
+const backupText=()=>JSON.stringify({app:'Unbroken',version:2,saved:new Date().toISOString(),settings:S.settings,social:S.social,habits:S.habits});
+function copyBackup(){
+  const txt=backupText(),fail=()=>{ui.sheet.copyText=txt;renderSheet();const c=$('#s-copy');if(c){c.focus();c.select();}};
+  try{navigator.clipboard.writeText(txt).then(()=>{toast('Backup copied. Paste it somewhere safe.');},fail);}catch(e){fail();}
+}
+function saveFile(){
+  if(!ui.dl)return;
+  ui.dl.save({filename:`unbroken-backup-${keyOf(today())}.json`,data:backupText()}).then(r=>{if(r&&r.status==='saved')toast('Backup saved');}).catch(e=>{if(e&&e.code==='declined')return;toast("Couldn't save the file here. Use Copy backup instead.");});
+}
+function restoreCheck(){
+  const sh=ui.sheet;let o;
+  try{o=JSON.parse(sh.restoreText||'');if(!o||typeof o!=='object'||!o.habits||typeof o.habits!=='object'||Array.isArray(o.habits))throw 0;}
+  catch(e){sh.restoreParsed=null;sh.restoreErr="That isn't an Unbroken backup. Paste the whole backup text, from the first { to the last }.";return renderSheet();}
+  sh.restoreErr='';sh.restoreParsed=o;renderSheet();
+}
+function restoreApply(){
+  const sh=ui.sheet,o=sh.restoreParsed;if(!o)return;
+  const nh={};
+  for(const [id,h] of Object.entries(o.habits)) if(SEG.test(id)&&id!=='settings'&&id!=='social'&&h&&typeof h==='object') nh[id]=normHabit({...h,id});
+  for(const id of Object.keys(S.habits)) if(!nh[id]) persist(id,null);
+  S.habits=nh;for(const h of Object.values(nh)) persist(h.id,clean(h));
+  if(o.settings){S.settings=normSettings(o.settings);persist('settings',{...S.settings});}
+  if(o.social){S.social=normSocial(o.social);persist('social',{...S.social});syncSubs();}
+  sh.restoreParsed=null;sh.restoreText='';render();renderSheet();syncPublic();
+  const n=Object.keys(nh).length;toast(`Restored ${n} ${n===1?'streak':'streaks'}`);
+}
+
+/* ---------- Events ---------- */
+let tapT=null,tapId=null,tapAt=0;
+function cardTap(id){
+  const now=performance.now();
+  if(tapId===id&&now-tapAt<330){clearTimeout(tapT);tapT=null;tapId=null;addOne(id);return;}
+  clearTimeout(tapT);tapId=id;tapAt=now;
+  tapT=setTimeout(()=>{tapT=null;tapId=null;if(S.habits[id])openSheet({kind:'detail',id,month:monthStartOf(today())});},330);
+}
+document.addEventListener('click',e=>{
+  const b=e.target.closest('[data-act]');if(!b||b.disabled)return;
+  const a=b.dataset.act,id=b.dataset.id,sh=ui.sheet;
+  switch(a){
+    case 'card':return cardTap(id);
+    case 'tab':ui.tab=b.dataset.v;ui.reorder=false;try{localStorage.setItem(TABKEY,ui.tab);}catch(x){}render();return window.scrollTo(0,0);
+    case 'inc':return adjust(id,1);
+    case 'dec':return adjust(id,-1);
+    case 'rest':return toggleRest(id);
+    case 'day':return cycleDay(sh.id,+b.dataset.d);
+    case 'mprev':sh.month=addMonths(sh.month,-1);return renderSheet();
+    case 'mnext':sh.month=addMonths(sh.month,1);return renderSheet();
+    case 'edit':return S.habits[id]&&openSheet({kind:'edit',isNew:false,draft:normHabit(clean(S.habits[id]))});
+    case 'archive':return archive(id,true);
+    case 'unarchive':return archive(id,false);
+    case 'new':return openSheet({kind:'edit',isNew:true,draft:newHabit()});
+    case 'settings':return openSheet({kind:'settings'});
+    case 'reorder':ui.reorder=!ui.reorder;return render();
+    case 'up':return move(id,-1);
+    case 'down':return move(id,1);
+    case 'close':return closeSheet();
+    case 'cancel':return sh&&!sh.isNew&&S.habits[sh.draft.id]?openSheet({kind:'detail',id:sh.draft.id,month:monthStartOf(today())}):closeSheet();
+    case 'icon':sh.draft.icon=b.dataset.v;return renderSheet();
+    case 'color':sh.draft.color=b.dataset.v;return renderSheet();
+    case 'photoClear':case 'pphotoClear':sh.draft.photo='';sh.draft.photoOk=false;sh.photoNote='';return renderSheet();
+    case 'hideToggle':sh.draft.hidden=!sh.draft.hidden;return renderSheet();
+    case 'stype':{const s=sh.draft.sched;s.type=b.dataset.v;if(s.type==='perWeek')s.times=clamp(s.times,1,7);if(s.type==='interval')s.every=Math.max(2,s.every);if(s.type==='weekdays'&&!s.days.length)s.days=[1,2,3,4,5];return renderSheet();}
+    case 'wday':{const s=sh.draft.sched,v=+b.dataset.v;s.days=s.days.includes(v)?s.days.filter(x=>x!==v):[...s.days,v].sort();return renderSheet();}
+    case 'step':{const f=b.dataset.f,d=sh.draft,v=(f==='every'||f==='times'?d.sched[f]:d[f])+(+b.dataset.d),c=clamp(v,+b.dataset.min,+b.dataset.max);if(f==='every'||f==='times')d.sched[f]=c;else d[f]=c;return renderSheet();}
+    case 'remindOk':try{localStorage.setItem(REMKEY,keyOf(today()));}catch(x){}return render();
+    case 'preset':{const [ic,c]=PRESETS[+b.dataset.i];Object.assign(sh.draft,{icon:ic,color:c,photo:'',photoOk:false});sh.photoNote='';sh.photoErr='';return renderSheet();}
+    case 'avatar':{const [ic,c]=AVATARS[+b.dataset.i];sh.draft.photo=presetImage(ic,c);sh.draft.photoOk=true;sh.photoErr='';return renderSheet();}
+    case 'more':sh.more=!sh.more;return renderSheet();
+    case 'reorderStart':closeSheet();ui.tab='mine';ui.reorder=true;render();return window.scrollTo(0,0);
+    case 'save':return saveDraft();
+    case 'del':sh.confirmDel=true;return renderSheet();
+    case 'delno':sh.confirmDel=false;return renderSheet();
+    case 'delyes':return removeHabit(sh.draft.id);
+    case 'set':return setSetting(b.dataset.k,b.dataset.n?+b.dataset.v:b.dataset.v);
+    case 'toggle':return setSetting(b.dataset.k,!S.settings[b.dataset.k]);
+    case 'copy':return copyBackup();
+    case 'saveFile':return saveFile();
+    case 'restoreCheck':return restoreCheck();
+    case 'restoreYes':return restoreApply();
+    case 'restoreNo':sh.restoreParsed=null;return renderSheet();
+    case 'delArch':sh.delArch=id;return renderSheet();
+    case 'delArchNo':sh.delArch=null;return renderSheet();
+    case 'delArchYes':return removeHabit(id,true);
+    case 'showhidden':ui.showHidden=true;return render();
+    case 'person':return openPerson(id);
+    case 'fopen':return openSheet({kind:'fdetail',pid:b.dataset.pid,id,month:monthStartOf(today())});
+    case 'back':return openPerson(sh.pid);
+    case 'follow':return follow(id,true);
+    case 'unfollow':return follow(id,false);
+    case 'me':
+    case 'profileEdit':{const me=social.profiles[social.uid];return openSheet({kind:'profile',draft:{name:me?me.name:'',photo:me?me.photo:'',photoOk:!!(me&&me.photo),bio:me?me.bio:'',private:me?me.private:false}});}
+    case 'pprivate':sh.draft.private=!sh.draft.private;return renderSheet();
+    case 'psave':return saveProfile();
+    case 'pleave':sh.confirmLeave=true;return renderSheet();
+    case 'pleaveNo':sh.confirmLeave=false;return renderSheet();
+    case 'pleaveYes':return leaveProfile();
+  }
+});
+document.addEventListener('input',e=>{
+  const t=e.target,sh=ui.sheet;if(!sh)return;
+  if(t.classList&&t.classList.contains('paste-box')){pasteBoxInput(t);return;}
+  if(sh.kind==='edit'){
+    const d=sh.draft;
+    switch(t.id){
+      case 'f-name':d.name=t.value;$('#nameErr').hidden=true;break;
+      case 'f-icon':{const v=graphemes(t.value.trim(),2);if(v){d.icon=v;if(!d.photo){const g=document.querySelector('.pp .glyph');if(g)g.textContent=v;}document.querySelectorAll('.ib').forEach(x=>x.setAttribute('aria-pressed',String(x.dataset.v===v)));}break;}
+      case 'f-color':if(HEX.test(t.value)){d.color=t.value.toLowerCase();const p=document.querySelector('.pp');if(p)p.style.setProperty('--hc',d.color);}break;
+      case 'f-unit':d.unit=t.value;break;
+      case 'f-group':d.group=t.value;break;
+      case 'f-start':if(DATE.test(t.value))d.start=t.value;break;
+      case 'f-note':d.note=t.value;break;
+    }
+  }else if(sh.kind==='profile'){
+    if(t.id==='p-name'){sh.draft.name=t.value;$('#pnameErr').hidden=true;}
+    if(t.id==='p-bio')sh.draft.bio=t.value;
+  }else if(sh.kind==='settings'&&t.id==='s-restore'){sh.restoreText=t.value;sh.restoreErr='';}
+});
+document.addEventListener('change',e=>{
+  const t=e.target,sh=ui.sheet;if(!sh)return;
+  if(t.id==='f-color')return renderSheet();
+  if(t.id==='s-roll')return setSetting('rollover',+t.value);
+  if(t.id==='s-sort')return setSetting('sort',t.value);
+  if(t.id==='s-remind'&&/^\d\d:\d\d$/.test(t.value))return setSetting('remindAt',t.value);
+  if(['f-photo','p-photo','f-photo2','p-photo2'].includes(t.id)&&t.files&&t.files[0]){takePhoto(t.files[0]);t.value='';}
+  if(t.id==='s-file'&&t.files&&t.files[0]){const r=new FileReader();r.onload=()=>{sh.restoreText=String(r.result||'');restoreCheck();};r.onerror=()=>{sh.restoreErr="Couldn't read that file.";renderSheet();};r.readAsText(t.files[0]);}
+});
+async function fileFromSrc(src){
+  if(/^data:image\//.test(src)){const b=dataBlob(src);return new File([b],'photo',{type:b.type});}
+  if(/^blob:/.test(src)){const b=await (await fetch(src)).blob();return new File([b],'photo',{type:b.type||'image/png'});}
+  return null;
+}
+function pasteBoxInput(box){
+  const img=box.querySelector('img'),src=img&&img.getAttribute('src');
+  box.innerHTML='';
+  if(src)fileFromSrc(src).then(f=>{if(f)takePhoto(f);else{ui.sheet.photoErr="Couldn't read that photo. Try saving it to your phone first.";renderSheet();}}).catch(()=>{ui.sheet.photoErr="Couldn't read that photo. Try saving it to your phone first.";renderSheet();});
+}
+document.addEventListener('beforeinput',e=>{
+  if(!(e.target.classList&&e.target.classList.contains('paste-box')))return;
+  const f=e.dataTransfer&&[...(e.dataTransfer.files||[])].find(x=>/^image\//.test(x.type));
+  if(f){e.preventDefault();takePhoto(f);}
+});
+document.addEventListener('paste',e=>{
+  const sh=ui.sheet;if(!sh||!['edit','profile'].includes(sh.kind)||!e.clipboardData)return;
+  const f=[...(e.clipboardData.files||[])].find(x=>/^image\//.test(x.type))||[...(e.clipboardData.items||[])].filter(x=>x.kind==='file'&&/^image\//.test(x.type)).map(x=>x.getAsFile()).find(Boolean);
+  const html=!f&&e.clipboardData.getData('text/html'),m=html&&html.match(/<img[^>]+src=["']([^"']+)["']/i);
+  if(f){e.preventDefault();takePhoto(f);}
+  else if(m&&/^(data:image\/|blob:)/.test(m[1])){e.preventDefault();fileFromSrc(m[1]).then(x=>x&&takePhoto(x)).catch(()=>{});}
+  else if(e.target&&e.target.classList&&e.target.classList.contains('paste-box')){e.preventDefault();sh.photoErr='That was text, not a photo. Copy a photo first, then paste it here.';renderSheet();}
+});
+document.addEventListener('dragover',e=>{if(ui.sheet&&e.target.closest&&e.target.closest('.photo-big'))e.preventDefault();});
+document.addEventListener('drop',e=>{const z=e.target.closest&&e.target.closest('.photo-big');if(!z||!ui.sheet)return;e.preventDefault();const f=[...(e.dataTransfer&&e.dataTransfer.files||[])].find(x=>/^image\//.test(x.type));if(f)takePhoto(f);});
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'&&ui.sheet)return closeSheet();
+  const c=e.target.closest&&e.target.closest('[data-act="card"]');
+  if(c&&(e.key==='+'||e.key==='=')){e.preventDefault();addOne(c.dataset.id);}
+});
+let lastPast=null;
+const dayCheck=()=>{const pr=pastRemind();if(today()!==lastT||pr!==lastPast){lastPast=pr;render();refreshSheet();}};
+setInterval(dayCheck,30000);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)dayCheck();});
+
+/* ---------- Saving ---------- */
+function saveLocal(){
+  try{
+    const dirty={};for(const [id,b] of W.pending)dirty[id]=b===null?0:1;
+    for(const id of W.inflight)if(!(id in dirty))dirty[id]=id==='settings'||id==='social'||S.habits[id]?1:0;
+    localStorage.setItem(KEY,JSON.stringify({v:2,mode:cacheMode,habits:S.habits,settings:S.settings,social:S.social,dirty}));
+  }catch(e){}
+}
+function loadLocal(){
+  try{
+    const raw=localStorage.getItem(KEY);if(!raw)return false;
+    const o=JSON.parse(raw);if(!o||typeof o!=='object')return false;
+    S.settings=normSettings(o.settings);S.social=normSocial(o.social);
+    for(const [id,h] of Object.entries(o.habits||{}))if(SEG.test(id)&&h&&typeof h==='object')S.habits[id]=normHabit({...h,id});
+    cacheMode=o.mode==='cloud'?'cloud':'local';
+    for(const [id,alive] of Object.entries(o.dirty||{}))if(SEG.test(id))W.pending.set(id,id==='settings'?{...S.settings}:id==='social'?{...S.social}:alive&&S.habits[id]?clean(S.habits[id]):null);
+    return Object.keys(S.habits).length>0;
+  }catch(e){return false;}
+}
+function persist(id,body){W.pending.set(id,body);if(store.mode==='cloud'&&store.ready)schedule(id);saveLocal();}
+function schedule(id,ms=350){clearTimeout(W.timers.get(id));W.timers.set(id,setTimeout(()=>{W.timers.delete(id);flush(id);},ms));}
+async function flush(id){
+  if(store.mode!=='cloud'||!store.ready||W.inflight.has(id)||!W.pending.has(id))return;
+  const body=W.pending.get(id);W.pending.delete(id);W.inflight.add(id);
+  let ok=false,again=0;
+  try{const ref=store.col.doc(id);if(body===null)await ref.delete();else await ref.set(body);ok=true;W.retry.delete(id);}
+  catch(e){
+    if(!W.pending.has(id))W.pending.set(id,body);
+    const c=e&&e.code;
+    if(c==='invalid_argument'||c==='transform_error'){W.inflight.delete(id);goLocal('readonly');return;}
+    if(c==='revoked'||c==='not_granted'||c==='capability_disabled'||c==='capability_removed'){W.inflight.delete(id);goLocal('lost');return;}
+    if(c==='quota_exceeded')notice('Your saved data is full. Delete a streak you no longer need, then try again.');
+    else{const n=(W.retry.get(id)||0)+1;W.retry.set(id,n);if(n<=4)again=1500*n+Math.random()*1000;else notice("Some changes haven't reached your account yet. They're kept on this device and will save with your next change.");}
+  }finally{W.inflight.delete(id);saveLocal();}
+  if(store.mode!=='cloud'||!W.pending.has(id))return;
+  if(ok)schedule(id,50);else if(again)schedule(id,again);
+}
+function goLocal(why){
+  if(store.unsub){try{store.unsub();}catch(e){}store.unsub=null;}
+  for(const t of W.timers.values())clearTimeout(t);W.timers.clear();
+  store.mode='local';store.why=why;cacheMode='local';saveLocal();render();
+}
+function onSnap(snap){
+  const definitive=!snap.metadata.fromCache,first=definitive&&!store.ready,seen=new Set();
+  for(const doc of snap.docs){
+    seen.add(doc.id);
+    if(W.pending.has(doc.id)||W.inflight.has(doc.id))continue;
+    const d=doc.data();if(!d)continue;
+    if(doc.id==='settings')S.settings=normSettings(clean(d));
+    else if(doc.id==='social')S.social=normSocial(clean(d));
+    else if(SEG.test(doc.id))S.habits[doc.id]=normHabit({...clean(d),id:doc.id});
+  }
+  if(definitive){
+    for(const id of Object.keys(S.habits))if(!seen.has(id)&&!W.pending.has(id)&&!W.inflight.has(id)){if(first&&cacheMode==='local')W.pending.set(id,clean(S.habits[id]));else delete S.habits[id];}
+    if(first&&cacheMode==='local'&&!seen.has('settings')&&!W.pending.has('settings'))W.pending.set('settings',{...S.settings});
+    if(first&&cacheMode==='local'&&!seen.has('social')&&!W.pending.has('social')&&S.social.following.length)W.pending.set('social',{...S.social});
+  }
+  if(first){
+    store.ready=true;
+    const moved=cacheMode==='local'&&[...W.pending.keys()].some(k=>k!=='settings'&&k!=='social'&&!seen.has(k));
+    cacheMode='cloud';
+    for(const id of W.pending.keys())schedule(id,50);
+    if(moved)toast('Your streaks are now saved to your account');
+  }
+  saveLocal();syncSubs();render();refreshSheet();syncPublic();
+}
+
+/* ---------- Sharing ---------- */
+const P={want:new Map(),inflight:new Set()};
+let syncT;
+const syncPublic=()=>{clearTimeout(syncT);syncT=setTimeout(doSync,600);};
+const pubBody=h=>clean({id:h.id,name:h.name,icon:h.icon,photo:h.photoOk?h.photo:'',color:h.color,sched:h.sched,goal:h.goal,unit:h.unit,start:h.start,freezes:h.freezes,log:h.log,skip:h.skip,order:h.order});
+function doSync(){
+  const uid=social.uid;
+  if(!social.db||!uid||!social.ownReady||!social.pReady||social.blocked||!(store.mode==='cloud'&&store.ready))return;
+  const me=social.leaving?null:social.profiles[uid],want=new Map();
+  if(me&&!me.private)for(const h of Object.values(S.habits))if(!h.archived&&!h.hidden&&h.name)want.set(`people/${uid}/streaks/${h.id}`,pubBody(h));
+  for(const [p,b] of want)if(social.ownKnown.get(p)!==stable(b))pubWrite(p,b);
+  for(const p of [...social.ownKnown.keys()])if(!want.has(p))pubWrite(p,null);
+  if(me&&me.streaks!==want.size){const body={name:me.name,photo:me.photo,bio:me.bio,private:me.private,joined:me.joined||Date.now(),streaks:want.size};social.profiles[uid]=normProfile(body);pubWrite(`people/${uid}`,body);}
+}
+function pubWrite(path,body){P.want.set(path,body);pubFlush(path);}
+async function pubFlush(path){
+  if(P.inflight.has(path)||!P.want.has(path)||!social.db)return;
+  const body=P.want.get(path);P.want.delete(path);P.inflight.add(path);
+  try{
+    const ref=social.db.doc(path);if(body===null)await ref.delete();else await ref.set(body);
+    if(path.includes('/streaks/')){if(body===null)social.ownKnown.delete(path);else social.ownKnown.set(path,stable(body));}
+  }catch(e){
+    const c=e&&e.code;
+    if(path==='people/'+social.uid&&body)toast("Couldn't save your profile. Check your connection and try again.");
+    if(c==='invalid_argument'||c==='transform_error'||c==='not_granted'||c==='revoked'){social.blocked=true;P.want.clear();renderSocial();}
+    else if(c==='quota_exceeded')notice("Your profile couldn't update because the saved data is full.");
+    else setTimeout(syncPublic,4000);
+  }finally{P.inflight.delete(path);}
+  if(P.want.has(path))pubFlush(path);
+}
+function syncSubs(){
+  if(!social.db)return;
+  const want=new Set(S.social.following.filter(x=>x!==social.uid).slice(0,40));
+  for(const [id,un] of social.subs)if(!want.has(id)){try{un();}catch(e){}social.subs.delete(id);delete social.streaks[id];}
+  for(const id of want)if(!social.subs.has(id)){
+    let col;try{col=social.db.collection('people/'+id+'/streaks');}catch(e){continue;}
+    social.subs.set(id,col.onSnapshot(snap=>{const m={};for(const d of snap.docs)if(SEG.test(d.id)){const x=normHabit({...clean(d.data()),id:d.id});x.name=maskBad(x.name);m[d.id]=x;}social.streaks[id]=m;renderSocial();},()=>{social.streaks[id]={};renderSocial();}));
+  }
+}
+function startSocial(db,user,uid){
+  social.db=db;social.user=user;social.uid=uid;
+  try{user.can('data.write').then(v=>{social.can=v;renderSocial();}).catch(()=>{});}catch(e){}
+  try{
+    db.collection('people').onSnapshot(snap=>{
+      const p={};for(const d of snap.docs){if(!SEG.test(d.id))continue;const x=normProfile(d.data());if(x)p[d.id]=x;}
+      if(social.leaving)delete p[uid];
+      if(P.want.has('people/'+uid)||P.inflight.has('people/'+uid)){if(social.profiles[uid])p[uid]=social.profiles[uid];else delete p[uid];}
+      social.profiles=p;if(!snap.metadata.fromCache)social.pReady=true;
+      syncPublic();renderSocial();
+    },()=>{social.pReady=true;renderSocial();});
+    db.collection('people/'+uid+'/streaks').onSnapshot(snap=>{
+      social.ownKnown=new Map(snap.docs.map(d=>[`people/${uid}/streaks/${d.id}`,stable(clean(d.data()))]));
+      if(!snap.metadata.fromCache){social.ownReady=true;syncPublic();}
+    },()=>{});
+  }catch(e){}
+  syncSubs();
+}
+async function connect(){
+  const C=window.claude;
+  if(!C||typeof C.use!=='function')return goLocal('none');
+  let db=null,user=null,dl=null;
+  try{[db,user,dl]=await Promise.all([C.use('db'),C.use('user'),C.use('downloads').catch(()=>null)]);}catch(e){}
+  C.use('sample').then(sm=>{ui.sample=sm||null;if(sm&&sm.limits)sm.limits().then(l=>{ui.sampleImg=!!(l&&l.images);}).catch(()=>{});}).catch(()=>{});
+  ui.dl=dl||null;
+  let uid=null;try{uid=user?await user.id():null;}catch(e){}
+  if(!db||!uid)return goLocal('none');
+  try{store.col=db.collection('data/users/'+uid);}catch(e){return goLocal('none');}
+  store.mode='cloud';
+  startSocial(db,user,uid);
+  const timer=setTimeout(()=>{if(!store.ready)notice("Can't reach your saved streaks yet. You're seeing what this device remembers, and new check-ins will sync once the connection is back.");},10000);
+  store.unsub=store.col.onSnapshot(snap=>{if(!snap.metadata.fromCache){clearTimeout(timer);if(!store.ready)notice('');}onSnap(snap);},()=>{clearTimeout(timer);if(store.mode==='cloud')goLocal('lost');});
+  render();if(ui.sheet&&ui.sheet.kind==='settings')renderSheet();
+}
+
+/* ---------- Start ---------- */
+ui.hadCache=loadLocal();
+render();
+connect();
+})();
+</script>
