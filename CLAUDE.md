@@ -16,5 +16,5 @@ Motif (first called Unbroken) is a streak tracker that is on its way to becoming
 - **Saving:** inside Claude, data lives in the page's database: private data under `data/users/<id>/` and public profiles under `people/<id>`. Outside Claude it falls back to `localStorage` (`unbroken:v1`). Give new saved fields a default and never rename existing ones, so people's saves keep working.
 - **Design:** follow DESIGN.md. Use its color roles, type, spacing, sizes and corners; add anything new to DESIGN.md before using it.
 - **Plain English** for the owner: say what changed in the app, and say plainly when something is untested.
-- **Never claim something works unless you ran it.** Test in a browser (Playwright is available) before pushing.
+- **Never claim something works unless you ran it.** Run `tests/run.sh` before pushing (see tests/README.md) and add tests for anything new. Known bugs live as `todo` tests until fixed.
 - **Commit messages** describe what the user sees, such as `App: preset profile pictures`.

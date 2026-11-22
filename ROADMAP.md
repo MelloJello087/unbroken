@@ -1,6 +1,6 @@
 # Motif feature roadmap
 
-Status: **plan, waiting for the owner's approval before Phase 1.**
+Status: **plan approved. Phase 0 complete; Phase 1 waits for the owner's go-ahead.**
 Backup of the working version before any of this: branch `backup/v1.0-before-expansion`.
 
 ## What already exists
@@ -29,6 +29,8 @@ Several requested features are partly or fully built. The plan extends them rath
 
 ## Decisions needed from the owner
 
+**Owner's decisions:** D1 keep the monthly free misses for now. D2 templates approved, optional only. D3 social features approved with proper server-side security. D4 phone app after Phase 2, once stable and tested. D5 review security first; no public repo or deploy without the owner's approval.
+
 - **D1. Freeze model.** Replace the monthly "free misses" with earned freezes: 1 per 7 successful days in a row, holding at most 3, on by default. Existing streaks that use free misses would switch to earned freezes, starting with as many as their monthly allowance (up to 3), so nobody loses protection overnight.
 - **D2. Templates.** Earlier you asked for no automatically added streaks. Proposal: templates appear only behind a "Start from a template" link on the New streak screen and are never shown or added unless chosen.
 - **D3. Where new social features run.** Shared streaks, challenges and reactions need database rules that only Supabase can express. They would work in the real app (GitHub Pages, later the phone app), not on the Claude test page. Everything in Phases 1 and 2 works in both.
@@ -50,10 +52,29 @@ Several requested features are partly or fully built. The plan extends them rath
 
 Sizes: S = a few hours, M = about a day, L = several days.
 
-### Phase 0: Ready the ground
-1. Backup branch. **Done.**
-2. Go live on GitHub Pages (owner's three steps, D5). **S**
-3. Add the browser test suite to the repo (double-tap, schedules, friends, privacy, uploads, delete, calendar). **M**
+### Phase 0: Ready the ground (complete)
+1. Backup branch `backup/v1.0-before-expansion`: verified identical to the pre-plan version. **Done.**
+2. Test suite in `tests/` (see tests/README.md): 29 logic tests, 23 screen tests and 6 server tests, plus 2 tracked known issues. Full run: 58 passed, 0 failed. Also runs on GitHub for every push. **Done.**
+3. Security review for going live (below). Going live waits for the owner's approval (D5).
+
+#### Phase 0 findings
+
+Bugs and limitations in the existing app:
+- **B1. Friends' changes aren't live in the account version.** With Supabase, other people's changes (and your own from another phone) arrive every 45 seconds or when you return to the app. The Claude test page updates live. Fix: Supabase Realtime, which needs the three tables added to Supabase's realtime list (a small database setting change, needs approval).
+- **B2. Word filter false alarms.** "Scunthorpe", "Matsushita" and "shitake" are blocked because they contain a rude word. Tracked as a known-issue test.
+- **B3. Hit rate is inflated on "certain weekdays" streaks** when you also do it on unscheduled days. Tracked as a known-issue test.
+- **B4. Two phones editing the same streak at the same moment:** the last save wins (roadmap R4).
+- **B5. No password reset and no way to delete an account** in the account version. Reset needs an email service.
+- **B6. Profile photos can't be uploaded in the account version** (the photo check isn't available there yet); preset pictures work.
+
+Security review (for D5):
+- **Good:** privacy rules on for every table; signed-out visitors have no access at all; the sign-up check and the network-fingerprint salt can't be reached by app users; every rule checked by tests; no secret in any of the 10 commits in the project's history; secrets check runs on every commit and push.
+- **Fix before going public:**
+  1. Bot protection on sign-up (CAPTCHA, for example Cloudflare Turnstile), since there is no email check.
+  2. A tamper check (integrity hash) on the Supabase library loaded from the public code host.
+  3. Turn on Supabase's leaked-password check if the plan allows it.
+  4. Set the site address in Supabase from `localhost` to the real one.
+- **Know before going public:** "public" profiles and streaks are visible to anyone with an account, and anyone can make one; the photo and word checks run only on the phone until Phase 3's server checks (R7); no account deletion or password reset (B5).
 
 ### Phase 1: Core improvements
 1. **Undo everywhere (S).** Undo after calendar taps and the +/− buttons too, not just double-tap. On a streak that's already done today with a goal of 1, a double-tap asks "Already done today. Add another?" instead of silently counting twice. Statistics update instantly and sync as today.
