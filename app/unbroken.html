@@ -841,7 +841,8 @@ function detailHTML(h,ro,pid){
     ${calHTML(h,e,ui.sheet.month,t,ro)}
     ${!ro&&h.note?`<blockquote class="note">${esc(h.note)}</blockquote>`:''}
     ${visLine}
-    ${ro?'':`<div class="actions"><button class="btn" data-act="edit" data-id="${h.id}">Edit streak</button><button class="btn ghost" data-act="archive" data-id="${h.id}">Archive</button></div>`}
+    ${ro?'':ui.sheet.confirmDel?`<div class="danger" role="alert"><p>Delete ${esc(nm)} and its ${Object.keys(h.log).length} ${Object.keys(h.log).length===1?'check-in':'check-ins'}?${social.profiles[social.uid]&&!h.hidden?' Friends will stop seeing it too.':''}</p><div class="row"><button class="btn danger" data-act="ddelyes" data-id="${h.id}">Delete streak</button><button class="btn ghost" data-act="ddelno">Keep it</button></div></div>`
+      :`<div class="actions"><button class="btn" data-act="edit" data-id="${h.id}">Edit streak</button><button class="btn ghost" data-act="archive" data-id="${h.id}">Archive</button><button class="btn ghost danger-text" data-act="ddel">Delete</button></div>`}
   </div>`;
 }
 function calHTML(h,e,m,t,ro){
@@ -1174,6 +1175,9 @@ document.addEventListener('click',e=>{
     case 'del':sh.confirmDel=true;return renderSheet();
     case 'delno':sh.confirmDel=false;return renderSheet();
     case 'delyes':return removeHabit(sh.draft.id);
+    case 'ddel':sh.confirmDel=true;renderSheet();{const d=$('#sheetBody .danger');if(d)d.scrollIntoView({block:'nearest',behavior:'smooth'});const y=$('[data-act="ddelno"]');if(y)y.focus({preventScroll:true});}return;
+    case 'ddelno':sh.confirmDel=false;return renderSheet();
+    case 'ddelyes':return removeHabit(id);
     case 'set':return setSetting(b.dataset.k,b.dataset.n?+b.dataset.v:b.dataset.v);
     case 'toggle':return setSetting(b.dataset.k,!S.settings[b.dataset.k]);
     case 'copy':return copyBackup();
