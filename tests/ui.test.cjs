@@ -263,3 +263,46 @@ test('phones: no sideways scrolling on any screen, small or large', async () => 
     for (const [name, go] of screens) { if (go) { await go(); await page.waitForTimeout(400); } assert.equal(await noSideScroll(page), true, `${name} on ${device}`); }
   }
 });
+
+/* ---------- Phase 1 ---------- */
+test('undo: a calendar tap can be undone and the saved data goes back exactly', async () => {
+  const { page, key } = await open();
+  await openStreak(page, 'h1');
+  const day = await page.evaluate(k => { const [y, m, d] = k.split('-').map(Number); return Math.round(Date.UTC(y, m - 1, d) / 864e5); }, key(12));
+  const cell = `button.cd[data-d="${day}"]`;
+  if (!(await page.$(cell))) { await page.tap('[data-act="mprev"]'); await page.waitForTimeout(200); }
+  const before = await doc(page, 'h1');
+  await page.tap(cell); await settle(page);
+  assert.match(await page.textContent('#toast span'), /: done$/);
+  assert.equal(await page.textContent('.bignum'), '12');
+  await page.tap('#undoBtn'); await settle(page);
+  assert.equal(await page.textContent('.bignum'), '11');
+  const after = await doc(page, 'h1');
+  assert.deepEqual([after.log, after.skip, after.start], [before.log, before.skip, before.start]);
+});
+
+test('undo: + and − and Rest day can each be undone', async () => {
+  const { page, today } = await open();
+  await openStreak(page, 'h1');
+  await page.tap('[data-act="inc"]'); await settle(page);
+  assert.equal((await doc(page, 'h1')).log[today], 1);
+  await page.tap('#undoBtn'); await settle(page);
+  assert.equal((await doc(page, 'h1')).log[today], undefined);
+  await page.tap('[data-act="rest"]'); await settle(page);
+  assert.equal((await doc(page, 'h1')).skip[today], 1);
+  await page.tap('#undoBtn'); await settle(page);
+  assert.equal((await doc(page, 'h1')).skip[today], undefined);
+  assert.equal(await page.textContent('.bignum'), '11');
+});
+
+test('a double-tap on a streak already done today asks instead of counting twice', async () => {
+  const { page, today } = await open();
+  assert.equal((await doc(page, 'h3')).log[today], 1);
+  await page.dblclick('.tile[data-id="h3"]'); await settle(page);
+  assert.match(await page.textContent('#toast span'), /already done today/);
+  assert.equal((await doc(page, 'h3')).log[today], 1, 'not counted twice');
+  await page.tap('#undoBtn'); await settle(page);
+  assert.equal((await doc(page, 'h3')).log[today], 2, '"Add again" counts it');
+  await page.tap('#undoBtn'); await settle(page);
+  assert.equal((await doc(page, 'h3')).log[today], 1, 'and that can be undone too');
+});

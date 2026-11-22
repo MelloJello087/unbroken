@@ -823,9 +823,9 @@ function applyTheme(){
 }
 function notice(msg){const n=$('#notice');n.textContent=msg||'';n.hidden=!msg;}
 let tt;
-function toast(msg,undo,big){
+function toast(msg,undo,big,label){
   const el=$('#toast');
-  el.innerHTML=`<span>${esc(msg)}</span>${undo?'<button type="button" id="undoBtn">Undo</button>':''}`;
+  el.innerHTML=`<span>${esc(msg)}</span>${undo?`<button type="button" id="undoBtn">${esc(label||'Undo')}</button>`:''}`;
   el.classList.toggle('big',!!big);el.classList.add('show');clearTimeout(tt);
   tt=setTimeout(()=>el.classList.remove('show'),undo?5000:2600);
   if(undo) $('#undoBtn').onclick=()=>{el.classList.remove('show');undo();};
@@ -1052,9 +1052,14 @@ function cheer(h,before){
   const a=evaluate(h);if(a.cur<=before.cur)return '';
   return S.settings.celebrate&&MILE[a.unit].includes(a.cur)?`${a.cur} ${uw(a.unit,a.cur)} in a row: ${nameOf(h)}`:'';
 }
-function addOne(id){
+function undoFor(id,k){
+  const h=S.habits[id],ln=h.log[k],sk=h.skip[k],st=h.start;
+  return ()=>{const x=S.habits[id];if(!x)return;if(ln)x.log[k]=ln;else delete x.log[k];if(sk)x.skip[k]=1;else delete x.skip[k];x.start=st;commit(x);};
+}
+function addOne(id,again){
   const h=S.habits[id];if(!h||h.archived)return;
   const k=keyOf(today()),pn=h.log[k]||0,ps=!!h.skip[k],before=evaluate(h);
+  if(h.goal===1&&pn>=1&&!again){fx(id);return toast(`${nameOf(h)}: already done today`,()=>addOne(id,true),false,'Add again');}
   h.log[k]=pn+1;delete h.skip[k];commit(h);fx(id,true,pn<h.goal&&pn+1>=h.goal);
   const n=h.log[k],nm=nameOf(h),big=cheer(h,before);
   const undo=()=>{const x=S.habits[id];if(!x)return;if(pn)x.log[k]=pn;else delete x.log[k];if(ps)x.skip[k]=1;commit(x);};
@@ -1063,20 +1068,22 @@ function addOne(id){
 function adjust(id,dl){
   const h=S.habits[id];if(!h)return;
   const k=keyOf(today()),n=Math.max(0,(h.log[k]||0)+dl),before=evaluate(h);
+  const undo=undoFor(id,k);
   if(n)h.log[k]=n;else delete h.log[k];if(dl>0)delete h.skip[k];
-  commit(h);const big=cheer(h,before);if(big)toast(big,null,true);
+  commit(h);const big=cheer(h,before);
+  toast(big||`${nameOf(h)}: ${h.goal>1?`${n} of ${h.goal} ${h.unit||'times'}`:`${n} today`}`,undo,!!big);
 }
 function toggleRest(id){
-  const h=S.habits[id];if(!h)return;const k=keyOf(today());
-  if(h.skip[k])delete h.skip[k];else{h.skip[k]=1;delete h.log[k];}
-  commit(h);
+  const h=S.habits[id];if(!h)return;const k=keyOf(today()),undo=undoFor(id,k),was=!!h.skip[k];
+  if(was)delete h.skip[k];else{h.skip[k]=1;delete h.log[k];}
+  commit(h);toast(was?'Rest day removed':`${nameOf(h)}: rest day today`,undo);
 }
 function cycleDay(id,d){
   const h=S.habits[id];if(!h||d>today())return;
-  const k=keyOf(d),n=h.log[k]||0,before=evaluate(h);
-  if(n>=h.goal){delete h.log[k];h.skip[k]=1;}else if(h.skip[k])delete h.skip[k];else{h.log[k]=h.goal;delete h.skip[k];}
+  const k=keyOf(d),n=h.log[k]||0,before=evaluate(h),undo=undoFor(id,k);
+  let now;if(n>=h.goal){delete h.log[k];h.skip[k]=1;now='rest day';}else if(h.skip[k]){delete h.skip[k];now='cleared';}else{h.log[k]=h.goal;delete h.skip[k];now='done';}
   if(d<dnOf(h.start))h.start=k;
-  commit(h);const big=cheer(h,before);if(big)toast(big,null,true);
+  commit(h);const big=cheer(h,before);toast(big||`${fmt(d)}: ${now}`,undo,!!big);
 }
 function archive(id,v){
   const h=S.habits[id];if(!h)return;h.archived=v;commit(h);
