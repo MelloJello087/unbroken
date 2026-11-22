@@ -1,6 +1,7 @@
 #!/bin/sh
 # Wraps app/unbroken.html in a full HTML document so it opens in any browser.
 # For the version with accounts, set SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY first.
+# The Supabase library is pinned to one version and checked against its fingerprint (integrity), so a changed copy is refused.
 # They come from the environment (on GitHub, from encrypted Actions secrets) and are never stored in this repository.
 set -e
 cd "$(dirname "$0")/.."
@@ -10,7 +11,7 @@ if [ -n "$SUPABASE_URL" ] || [ -n "$SUPABASE_PUBLISHABLE_KEY" ]; then
   case "$SUPABASE_URL" in https://*.supabase.co) ;; *) echo "SUPABASE_URL must look like https://xxxx.supabase.co" >&2; exit 1;; esac
   if ! printf '%s' "$SUPABASE_PUBLISHABLE_KEY" | grep -Eq '^[A-Za-z0-9_.-]{20,}$'; then echo "SUPABASE_PUBLISHABLE_KEY is missing or malformed" >&2; exit 1; fi
   config="<script>window.UNBROKEN_CONFIG={supabaseUrl:\"$SUPABASE_URL\",supabaseKey:\"$SUPABASE_PUBLISHABLE_KEY\"};</script>
-<script src=\"https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js\"></script>"
+<script src=\"https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js\" integrity=\"sha384-0w2KAL2YHP6wKOkUDzkCDGgVvfmHnj02DHeQ6XcHOgTfFsGyonKOpShMH1x6nk9o\" crossorigin=\"anonymous\"></script>"
 fi
 {
   printf '<!doctype html>\n<html lang="en"><head><meta charset="utf-8">\n'
