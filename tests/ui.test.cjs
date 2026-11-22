@@ -306,3 +306,39 @@ test('a double-tap on a streak already done today asks instead of counting twice
   await page.tap('#undoBtn'); await settle(page);
   assert.equal((await doc(page, 'h3')).log[today], 1, 'and that can be undone too');
 });
+
+test('archive: an "Archived" link on the dashboard opens the archived streaks, with their history', async () => {
+  const { page, errors } = await open();
+  assert.equal(await page.$$eval('[data-act="archived"]', x => x.length), 0, 'no link when nothing is archived');
+  await openStreak(page, 'h1'); await page.tap('[data-act="archive"]'); await settle(page);
+  assert.equal(await page.textContent('[data-act="archived"]'), 'Archived (1)');
+  await page.tap('[data-act="archived"]'); await page.waitForTimeout(400);
+  assert.match(await page.textContent('#sheetBody .srow'), /Read 20 pages.*11 check-ins · best 11 days/);
+  assert.match(await page.textContent('#sheetBody .hint'), /history kept/);
+  await page.tap('[data-act="unarchive"][data-id="h1"]'); await settle(page);
+  assert.match(await page.textContent('#sheetBody'), /Nothing archived/);
+  await closeSheet(page);
+  assert.equal(await page.$$eval('[data-act="archived"]', x => x.length), 0);
+  assert.equal(await page.textContent('.tile[data-id="h1"] .tile-streak b'), '11');
+  noErrors(errors);
+});
+
+test('archive: deleting from the archived list asks first and can be undone', async () => {
+  const { page } = await open();
+  await openStreak(page, 'h1'); await page.tap('[data-act="archive"]'); await settle(page);
+  await page.tap('[data-act="archived"]'); await page.waitForTimeout(400);
+  await page.tap('[data-act="delArch"][data-id="h1"]');
+  assert.equal(await page.isVisible('[data-act="delArchYes"]'), true);
+  await page.tap('[data-act="delArchYes"]'); await settle(page);
+  assert.equal(await doc(page, 'h1'), null);
+  await page.tap('#undoBtn'); await settle(page);
+  assert.equal((await doc(page, 'h1')).archived, true);
+  assert.equal(Object.keys((await doc(page, 'h1')).log).length, 11);
+});
+
+test('archive: with every streak archived, the dashboard still offers the archived link', async () => {
+  const { page } = await open();
+  for (const id of ['h1', 'h2', 'h3']) { await openStreak(page, id); await page.tap('[data-act="archive"]'); await settle(page); }
+  assert.match(await page.textContent('#empty'), /No streaks yet/);
+  assert.equal(await page.textContent('[data-act="archived"]'), 'Archived (3)');
+});

@@ -145,6 +145,8 @@ div.card{cursor:default}
 .today.on span{color:var(--hc-on)}
 .today small{font-size:9px;opacity:.75}
 .mv{display:flex;gap:var(--s2);grid-column:span 2;justify-self:end}
+.arch-link{display:flex;justify-content:center;margin-top:var(--s5)}
+.arch-link .btn{color:var(--ink-2)}
 .hidden-note{font:var(--t-sm);color:var(--ink-2);text-align:center;margin-top:var(--s3)}
 .link{background:none;border:none;padding:var(--s1);font:var(--t-sm);font-weight:600;color:var(--accent);cursor:pointer;text-decoration:underline;text-underline-offset:3px}
 
@@ -738,7 +740,7 @@ function renderMine(t){
     sum.innerHTML=`<p class="eyebrow">${esc(date)}</p><h2 class="headline">${esc(head)}</h2>`;
   }
   const list=$('#list'),empty=$('#empty');
-  if(!active.length){list.innerHTML='';empty.hidden=false;empty.innerHTML=emptyHTML(t);}
+  if(!active.length){const na=Object.values(S.habits).filter(h=>h.archived).length;list.innerHTML=na?`<div class="arch-link"><button type="button" class="btn sm ghost" data-act="archived">Archived (${na})</button></div>`:'';empty.hidden=false;empty.innerHTML=emptyHTML(t);}
   else{
     empty.hidden=true;empty.innerHTML='';
     let arr=ui.reorder?[...active].sort((a,b)=>a.order-b.order):sorted(active,evs),hidden=0;
@@ -748,6 +750,8 @@ function renderMine(t){
     let html=ui.reorder?'':reminderHTML(active,evs,t);
     html+=ui.reorder?`<div class="reorder-bar"><span>Use the arrows to change the order.</span><button class="btn sm primary" data-act="reorder">Done</button></div>`:'';
     html+=groupList(arr).map(([g,hs])=>`<section class="group">${g?`<h2 class="grp">${esc(g)}</h2>`:''}<div class="${grid?'grid':'cards'}">${hs.map(h=>grid?tileHTML(h,evs.get(h.id),t):cardHTML(h,evs.get(h.id),t)).join('')}</div></section>`).join('');
+    const na=Object.values(S.habits).filter(h=>h.archived).length;
+    if(na&&!ui.reorder)html+=`<div class="arch-link"><button type="button" class="btn sm ghost" data-act="archived">Archived (${na})</button></div>`;
     if(hidden) html+=`<p class="hidden-note">${arr.length?'':'All done for today. '}${hidden} finished ${hidden===1?'streak is':'streaks are'} hidden. <button class="link" data-act="showhidden">Show</button></p>`;
     list.innerHTML=html;
   }
@@ -962,14 +966,22 @@ function personHTML(id){
   <div class="detail"><div class="phead">${avatarHTML(id,'av-xl')}<h3>${esc(displayName(id))}</h3>${p&&p.bio?`<p>${esc(p.bio)}</p>`:''}
     <div class="row">${fol?`<button class="btn sm" data-act="unfollow" data-id="${id}">Remove</button>`:`<button class="btn sm primary" data-act="follow" data-id="${id}">Add</button>`}</div></div>${body}</div>`;
 }
+function archRowsHTML(sh){
+  const arch=Object.values(S.habits).filter(h=>h.archived).sort((a,b)=>a.order-b.order);
+  if(!arch.length)return '<div class="srow"><span class="sl muted">Nothing archived. Archive a streak to pause it without losing its history.</span></div>';
+  return arch.map(h=>{const e=evaluate(h),n=Object.keys(h.log).length;return `<div class="srow" style="--hc:${h.color}"><span class="arow"><span class="ico-sm">${h.photo?`<img src="${esc(h.photo)}" alt="">`:esc(h.icon)}</span><span class="sl">${esc(nameOf(h))}<small>${n} ${n===1?'check-in':'check-ins'} · best ${e.best} ${uw(e.unit,e.best)}</small></span></span><span class="row">${sh.delArch===h.id
+      ?`<button class="btn sm danger" data-act="delArchYes" data-id="${h.id}">Delete for good</button><button class="btn sm ghost" data-act="delArchNo">Keep</button>`
+      :`<button class="btn sm" data-act="unarchive" data-id="${h.id}">Bring back</button><button class="btn sm ghost danger-text" data-act="delArch" data-id="${h.id}">Delete</button>`}</span></div>`;}).join('');
+}
+function archivedHTML(){
+  return `<div class="sh-head"><h2>Archived</h2><button class="icon-btn" data-act="close" aria-label="Close">${I.x}</button></div>
+  <div class="settings"><p class="hint">Archived streaks are paused and off your dashboard, with their history kept. Bring one back to carry on where you left off. Delete removes it and its history for good.</p><div class="set">${archRowsHTML(ui.sheet)}</div></div>`;
+}
 function settingsHTML(){
   const s=S.settings,sh=ui.sheet,arch=Object.values(S.habits).filter(h=>h.archived),count=Object.keys(S.habits).length;
   const seg=(k,opts,num)=>`<div class="seg">${opts.map(([v,l])=>`<button type="button" data-act="set" data-k="${k}" data-v="${v}"${num?' data-n="1"':''} aria-pressed="${String(s[k])===String(v)}">${l}</button>`).join('')}</div>`;
   const tg=(k,l,hint)=>`<div class="srow"><span class="sl">${l}${hint?`<small>${hint}</small>`:''}</span><button type="button" class="tg" role="switch" aria-checked="${!!s[k]}" data-act="toggle" data-k="${k}" aria-label="${l}"></button></div>`;
-  const archRows=arch.length?arch.map(h=>`<div class="srow" style="--hc:${h.color}"><span class="arow"><span class="ico-sm">${h.photo?`<img src="${esc(h.photo)}" alt="">`:esc(h.icon)}</span>${esc(nameOf(h))}</span><span class="row">${sh.delArch===h.id
-      ?`<button class="btn sm danger" data-act="delArchYes" data-id="${h.id}">Delete for good</button><button class="btn sm ghost" data-act="delArchNo">Keep</button>`
-      :`<button class="btn sm" data-act="unarchive" data-id="${h.id}">Bring back</button><button class="btn sm ghost" data-act="delArch" data-id="${h.id}">Delete</button>`}</span></div>`).join('')
-    :'<div class="srow"><span class="sl muted">Nothing archived. Archive a streak to pause it without losing its history.</span></div>';
+  const archRows=archRowsHTML(sh);
   const rp=sh.restoreParsed,rn=rp?Object.keys(rp.habits).length:0;
   return `<div class="sh-head"><h2>Settings</h2><button class="icon-btn" data-act="close" aria-label="Close">${I.x}</button></div>
   <div class="settings">
@@ -1021,6 +1033,7 @@ function renderSheet(fresh){
   else if(sh.kind==='person'){b.innerHTML=personHTML(sh.id);sheet.setAttribute('aria-label',displayName(sh.id));}
   else if(sh.kind==='edit'){b.innerHTML=editorHTML();sheet.setAttribute('aria-label',sh.isNew?'New streak':'Edit streak');}
   else if(sh.kind==='profile'){b.innerHTML=profileHTML();sheet.setAttribute('aria-label','Your profile');}
+  else if(sh.kind==='archived'){b.innerHTML=archivedHTML();sheet.setAttribute('aria-label','Archived');}
   else{b.innerHTML=settingsHTML();sheet.setAttribute('aria-label','Settings');}
   b.scrollTop=y;
   if(sig){const el=b.querySelector(sig);if(el)el.focus({preventScroll:true});}
@@ -1088,14 +1101,14 @@ function cycleDay(id,d){
 function archive(id,v){
   const h=S.habits[id];if(!h)return;h.archived=v;commit(h);
   if(v){if(ui.sheet&&ui.sheet.kind==='detail')closeSheet();toast(`Archived ${nameOf(h)}`,()=>archive(id,false));}
-  else if(ui.sheet&&ui.sheet.kind==='settings')renderSheet();
+  else if(ui.sheet&&['settings','archived'].includes(ui.sheet.kind))renderSheet();
 }
 function removeHabit(id,fromSettings){
   const h=S.habits[id];if(!h)return;const copy=clean(h);
   delete S.habits[id];persist(id,null);syncPublic();
   if(fromSettings){ui.sheet.delArch=null;renderSheet();}else closeSheet();
   render();
-  toast(`Deleted ${nameOf(copy)}`,()=>{S.habits[id]=normHabit(copy);persist(id,clean(S.habits[id]));syncPublic();render();if(ui.sheet&&ui.sheet.kind==='settings')renderSheet();});
+  toast(`Deleted ${nameOf(copy)}`,()=>{S.habits[id]=normHabit(copy);persist(id,clean(S.habits[id]));syncPublic();render();if(ui.sheet&&['settings','archived'].includes(ui.sheet.kind))renderSheet();});
 }
 function move(id,dir){
   const act=Object.values(S.habits).filter(h=>!h.archived).sort((a,b)=>a.order-b.order),h=S.habits[id];if(!h)return;
@@ -1189,6 +1202,7 @@ document.addEventListener('click',e=>{
     case 'unarchive':return archive(id,false);
     case 'new':return openSheet({kind:'edit',isNew:true,draft:newHabit()});
     case 'settings':return openSheet({kind:'settings'});
+    case 'archived':return openSheet({kind:'archived'});
     case 'reorder':ui.reorder=!ui.reorder;return render();
     case 'up':return move(id,-1);
     case 'down':return move(id,1);

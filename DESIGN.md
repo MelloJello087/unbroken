@@ -87,5 +87,6 @@ Control heights: `--h-sm` 36px, `--h-md` 44px (the default; every tap target is 
 - **Form buttons**: the primary action is the wider button, Cancel a bordered button beside it.
 - **Calendar**: rows 36px tall with 4px gaps. Done days fill with the streak color, missed days are a muted filled square with a hairline edge (the number always stays readable), rest days are dashed, and today has a single ink outline with a bold number.
 - **Sheet**: rises from the bottom with a grab handle, a title on the left, a close button on the right, and a 20px inner margin.
+- **Archived** link: a small ghost button, "Archived (n)", centered after the last streak, shown only when something is archived. It opens the Archived sheet (a grouped list with Bring back and Delete).
 - **Grouped list** (settings, people, privacy): one bordered card with hairline dividers between rows; each row is at least 52px tall.
 - **Buttons**: primary (filled accent), secondary (surface with a hairline), ghost (text only), danger. Heights 44, or 36 when small.
