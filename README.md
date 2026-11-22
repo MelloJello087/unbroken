@@ -19,6 +19,14 @@ Inside Claude, sign-in, saving, friends and the photo check all go through the v
 
 To try it in a normal browser, run `tools/standalone.sh` and open `dist/index.html`.
 
+## Keeping secrets out
+
+Passwords, keys, tokens and codes never go in this repository. A check blocks them before every commit and again on GitHub. After cloning, turn on the local check once:
+
+```
+git config core.hooksPath .githooks
+```
+
 ## Plan to become a real app
 
 1. **Accounts and database (next).** Move sign-in and saving to Supabase: email and password with strong password rules (8+ characters, upper and lower case, a number and a symbol), log in and out, password reset, and a limit on sign-ups enforced by the server.
