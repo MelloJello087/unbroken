@@ -169,3 +169,15 @@ test('hit rate on "certain weekdays" counts scheduled days only (was a known iss
 test('word filter: still catches rude words at the start or end of a longer word', () => {
   for (const w of ['bullshit', 'dipshit', 'horseshit', 'fuckface', 'shithead', 'ohfuck', 'motherfucker', 'shiiiit']) assert.equal(M.hasBad(w), true, w);
 });
+
+test('reminder settings: old saves get safe defaults; bad times are ignored', () => {
+  const h = M.normHabit({ id: 'h', name: 'x' });
+  assert.equal(h.remindMode, 'default'); assert.equal(h.remindAt, '');
+  const c = M.normHabit({ id: 'h', name: 'x', remindMode: 'custom', remindAt: '21:30' });
+  assert.equal(c.remindMode, 'custom'); assert.equal(c.remindAt, '21:30');
+  const bad = M.normHabit({ id: 'h', name: 'x', remindMode: 'loud', remindAt: '25:99' });
+  assert.equal(bad.remindMode, 'default'); assert.equal(bad.remindAt, '');
+  const s = M.normSettings({});
+  assert.deepEqual([s.quiet, s.quietFrom, s.quietTo], [false, '22:00', '07:00']);
+  assert.equal(M.normSettings({ quietFrom: '7pm' }).quietFrom, '22:00');
+});

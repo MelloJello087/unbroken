@@ -469,9 +469,9 @@ const ICONS=['📚','💧','🏃','🧘','💪','🥗','😴','✍️','🎸','�
 const PRESETS=[['📚','#5f8f3e'],['💧','#3c8d8a'],['🏃','#cf7a3a'],['🧘','#7c6aa3'],['💪','#b5523b'],['🥗','#8aa83a'],['😴','#4f7aa3'],['🎸','#b25a7a'],['🌱','#2f7d5b'],['✍️','#a39a35'],['🧠','#c9a227'],['🚶','#8c5a3c']];
 const AVATARS=[['🌲','#2f7d5b'],['🦊','#cf7a3a'],['🐻','#8c5a3c'],['🌻','#c9a227'],['🍄','#b5523b'],['🦉','#7c6aa3'],['🐢','#5f8f3e'],['🌙','#4f7aa3'],['⛰️','#3c8d8a'],['🌊','#1d6b7c'],['🔥','#a24c2e'],['🐝','#a39a35']];
 const SCHED=[['daily','Every day'],['weekdays','Certain days'],['interval','Every few days'],['perWeek','Times a week'],['perMonth','Times a month']];
-const DEF={remind:true,remindAt:'07:00',theme:'forest',weekStart:1,rollover:0,layout:'grid',sort:'manual',groups:true,hideDone:false,celebrate:true};
+const DEF={remind:true,remindAt:'07:00',quiet:false,quietFrom:'22:00',quietTo:'07:00',theme:'forest',weekStart:1,rollover:0,layout:'grid',sort:'manual',groups:true,hideDone:false,celebrate:true};
 const MILE={day:[3,7,14,21,30,50,75,100,150,200,250,300,365,500,750,1000],week:[2,4,8,12,26,52,104],month:[3,6,12,24,36]};
-const HEX=/^#[0-9a-f]{6}$/i, DATE=/^\d{4}-\d\d-\d\d$/, SEG=/^[A-Za-z0-9_\-.~:@+]{1,64}$/, IMG=/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/;
+const HHMM=/^([01]\d|2[0-3]):[0-5]\d$/,HEX=/^#[0-9a-f]{6}$/i, DATE=/^\d{4}-\d\d-\d\d$/, SEG=/^[A-Za-z0-9_\-.~:@+]{1,64}$/, IMG=/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/;
 const sv=p=>`<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${p}</svg>`;
 const I={check:sv('<path d="M5 12.5l4.5 4.5L19 7.5"/>'),plus:sv('<path d="M12 5v14M5 12h14"/>'),minus:sv('<path d="M5 12h14"/>'),x:sv('<path d="M6 6l12 12M18 6L6 18"/>'),left:sv('<path d="M15 6l-6 6 6 6"/>'),right:sv('<path d="M9 6l6 6-6 6"/>'),up:sv('<path d="M6 15l6-6 6 6"/>'),down:sv('<path d="M6 9l6 6 6-6"/>'),moon:sv('<path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/>'),upload:sv('<path d="M12 15V4M7.5 8.5 12 4l4.5 4.5M5 20h14"/>')};
 
@@ -575,8 +575,8 @@ function normSettings(o){
   if(Number.isInteger(o.rollover)&&o.rollover>=0&&o.rollover<=5) s.rollover=o.rollover;
   if(['grid','list','compact'].includes(o.layout)) s.layout=o.layout; else if(o.density==='compact') s.layout='compact';
   if(['manual','streak','name','due'].includes(o.sort)) s.sort=o.sort;
-  if(typeof o.remindAt==='string'&&/^([01]\d|2[0-3]):[0-5]\d$/.test(o.remindAt)) s.remindAt=o.remindAt;
-  for(const k of ['groups','hideDone','celebrate','remind']) if(typeof o[k]==='boolean') s[k]=o[k];
+  for(const k of ['remindAt','quietFrom','quietTo']) if(typeof o[k]==='string'&&HHMM.test(o[k])) s[k]=o[k];
+  for(const k of ['groups','hideDone','celebrate','remind','quiet']) if(typeof o[k]==='boolean') s[k]=o[k];
   return s;
 }
 function normSocial(o){const f=o&&Array.isArray(o.following)?o.following:[];return {following:[...new Set(f.filter(x=>typeof x==='string'&&SEG.test(x)))].slice(0,60)};}
@@ -587,7 +587,7 @@ function normHabit(h){
   const o={id:String(h.id),name:String(h.name??'').slice(0,60),icon:String(h.icon||'•').slice(0,16),photo:okImg(h.photo),photoOk:!!h.photoOk,color:HEX.test(h.color)?h.color.toLowerCase():COLORS[0],
     sched:{type:types.includes(s.type)?s.type:'daily',days:Array.isArray(s.days)?[...new Set(s.days.filter(d=>Number.isInteger(d)&&d>=0&&d<7))].sort():[1,3,5],every:clamp((s.every|0)||2,1,60),times:clamp((s.times|0)||3,1,31)},
     goal:clamp((h.goal|0)||1,1,999),unit:String(h.unit||'').slice(0,20),start:DATE.test(h.start)?h.start:keyOf(today()),freezes:clamp(h.freezes|0,0,9),
-    group:String(h.group||'').slice(0,30),note:String(h.note||'').slice(0,300),archived:!!h.archived,hidden:!!h.hidden,order:Number.isFinite(h.order)?h.order:0,created:Number.isFinite(h.created)?h.created:Date.now(),log:{},skip:{}};
+    group:String(h.group||'').slice(0,30),remindMode:['default','custom','off'].includes(h.remindMode)?h.remindMode:'default',remindAt:typeof h.remindAt==='string'&&HHMM.test(h.remindAt)?h.remindAt:'',note:String(h.note||'').slice(0,300),archived:!!h.archived,hidden:!!h.hidden,order:Number.isFinite(h.order)?h.order:0,created:Number.isFinite(h.created)?h.created:Date.now(),log:{},skip:{}};
   if(h.log&&typeof h.log==='object') for(const [k,v] of Object.entries(h.log)) if(DATE.test(k)&&v>0) o.log[k]=Math.min(9999,Math.floor(v));
   if(h.skip&&typeof h.skip==='object') for(const k of Object.keys(h.skip)) if(DATE.test(k)&&h.skip[k]) o.skip[k]=1;
   return o;
@@ -718,13 +718,20 @@ function emptyHTML(){
 }
 const REMKEY='unbroken:reminded';
 const fmtTime=v=>{const [h,m]=v.split(':').map(Number);return `${h%12||12}:${pad(m)} ${h<12?'AM':'PM'}`;};
-const pastRemind=()=>{const [h,m]=S.settings.remindAt.split(':').map(Number),n=new Date();return n.getHours()*60+n.getMinutes()>=h*60+m;};
+const mins=v=>{const [h,m]=v.split(':').map(Number);return h*60+m;};
+const nowMins=()=>{const n=new Date();return n.getHours()*60+n.getMinutes();};
+function inQuiet(m=nowMins()){const s=S.settings;if(!s.quiet)return false;const a=mins(s.quietFrom),b=mins(s.quietTo);return a===b?false:a<b?m>=a&&m<b:m>=a||m<b;}
+const remindTime=h=>h.remindMode==='off'?null:h.remindMode==='custom'&&h.remindAt?h.remindAt:S.settings.remind?S.settings.remindAt:null;
+function dueReminders(active,evs,t){
+  if(inQuiet())return [];
+  const m=nowMins();let seen=[];try{const v=localStorage.getItem(REMKEY)||'';if(v.startsWith(keyOf(t)+'|'))seen=v.split('|')[1].split(',');}catch(e){}
+  return active.filter(h=>{const e=evs.get(h.id),at=remindTime(h);return at&&e.dueToday&&!e.doneToday&&!h.skip[keyOf(t)]&&m>=mins(at)&&!seen.includes(h.id);});
+}
 function reminderHTML(active,evs,t){
-  if(!S.settings.remind||!pastRemind())return '';
-  try{if(localStorage.getItem(REMKEY)===keyOf(t))return '';}catch(e){}
-  const left=active.filter(h=>{const e=evs.get(h.id);return e.dueToday&&!e.doneToday;}).length;
-  if(!left)return '';
-  return `<div class="reminder" role="status">${sv('<path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/>')}<span>${left} ${left===1?'streak is':'streaks are'} still to do today.</span><button class="link" data-act="remindOk">Got it</button></div>`;
+  const due=dueReminders(active,evs,t);ui.reminding=due.map(h=>h.id);
+  if(!due.length)return '';
+  const msg=due.length===1?`${nameOf(due[0])} is still to do today.`:`${due.length} streaks are still to do today.`;
+  return `<div class="reminder" role="status">${sv('<path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/>')}<span>${esc(msg)}</span><button class="link" data-act="remindOk">Got it</button></div>`;
 }
 function renderMine(t){
   const active=Object.values(S.habits).filter(h=>!h.archived);
@@ -912,6 +919,8 @@ function editorHTML(){
     <div class="field"><span class="lab">Other schedules</span><div class="seg">${other.map(segBtn).join('')}</div></div>
     <div class="field"><span class="lab">A day counts after</span><div class="row">${stepper('goal',E.goal,1,99)} ${E.goal===1?'double-tap':'double-taps'}</div>
       ${E.goal>1?`<input id="f-unit" value="${esc(E.unit)}" maxlength="16" placeholder="What you count, like glasses or pages" autocomplete="off" aria-label="What you count">`:''}</div>
+    <div class="field"><span class="lab">Reminder</span><div class="seg">${[['default',S.settings.remind?`Default (${fmtTime(S.settings.remindAt)})`:'Default (off)'],['custom','Own time'],['off','Off']].map(([v,l])=>`<button type="button" data-act="rmode" data-v="${v}" aria-pressed="${E.remindMode===v}">${l}</button>`).join('')}</div>
+      ${E.remindMode==='custom'?`<input type="time" id="f-remind" value="${esc(E.remindAt||S.settings.remindAt)}" style="width:auto" aria-label="Reminder time">`:''}<small class="hint">Only on days it's scheduled, and never once it's done.</small></div>
     <div class="field"><span class="lab">Free misses</span><div class="row">${stepper('freezes',E.freezes,0,5)} per ${sc.type==='perMonth'?'year':'month'}</div>
       <small class="hint">Covers a missed ${unit} so the streak survives.</small></div>
     ${canShare?`<div class="field"><div class="switch-row"><span class="sl">Show to friends<small>People who add you can see this streak and its photo.</small></span><button type="button" class="tg" role="switch" aria-checked="${!E.hidden}" data-act="hideToggle" aria-label="Show to friends"></button></div></div>`:''}
@@ -990,8 +999,10 @@ function settingsHTML(){
       <div class="srow"><span class="sl">Layout</span>${seg('layout',[['grid','Photo grid'],['list','List'],['compact','Compact']])}</div>
     </div></section>
     <section><h3>Reminder</h3><div class="set">
-      ${tg('remind','Daily reminder',s.remind?`Every day at ${fmtTime(s.remindAt)}, if a streak is still to do.`:'Off')}
+      ${tg('remind','Default reminder',s.remind?`At ${fmtTime(s.remindAt)} on days a streak is scheduled and not yet done. Each streak can have its own time.`:'Off. Streaks with their own time still remind you.')}
       ${s.remind?`<div class="srow"><label class="sl" for="s-remind">Remind me at</label><input type="time" id="s-remind" value="${s.remindAt}" style="width:auto"></div>`:''}
+      ${tg('quiet','Quiet hours',s.quiet?`No reminders from ${fmtTime(s.quietFrom)} to ${fmtTime(s.quietTo)}.`:'Off')}
+      ${s.quiet?`<div class="srow"><span class="sl">From and to</span><span class="row"><input type="time" id="s-qfrom" value="${s.quietFrom}" style="width:auto" aria-label="Quiet from"><input type="time" id="s-qto" value="${s.quietTo}" style="width:auto" aria-label="Quiet until"></span></div>`:''}
       <div class="srow"><span class="sl muted" style="font-size:12.5px">For now the reminder shows inside Motif when you open it. Phone notifications arrive once Motif is installed as an app.</span></div>
     </div></section>
     <section><h3>Days</h3><div class="set">
@@ -1216,9 +1227,10 @@ document.addEventListener('click',e=>{
     case 'wday':{const s=sh.draft.sched,v=+b.dataset.v;s.days=s.days.includes(v)?s.days.filter(x=>x!==v):[...s.days,v].sort();return renderSheet();}
     case 'step':{const f=b.dataset.f,d=sh.draft,v=(f==='every'||f==='times'?d.sched[f]:d[f])+(+b.dataset.d),c=clamp(v,+b.dataset.min,+b.dataset.max);if(f==='every'||f==='times')d.sched[f]=c;else d[f]=c;return renderSheet();}
     case 'logout':return logOut();
-    case 'remindOk':try{localStorage.setItem(REMKEY,keyOf(today()));}catch(x){}return render();
+    case 'remindOk':{let prev=[];try{const v=localStorage.getItem(REMKEY)||'',d=keyOf(today());if(v.startsWith(d+'|'))prev=v.split('|')[1].split(',');localStorage.setItem(REMKEY,d+'|'+[...new Set([...prev,...(ui.reminding||[])])].join(','));}catch(x){}return render();}
     case 'preset':{const [ic,c]=PRESETS[+b.dataset.i];Object.assign(sh.draft,{icon:ic,color:c,photo:'',photoOk:false});sh.photoNote='';sh.photoErr='';return renderSheet();}
     case 'avatar':{const [ic,c]=AVATARS[+b.dataset.i];sh.avatarIdx=+b.dataset.i;sh.draft.photo=presetImage(ic,c);sh.draft.photoOk=true;sh.photoErr='';return renderSheet();}
+    case 'rmode':sh.draft.remindMode=b.dataset.v;if(b.dataset.v==='custom'&&!sh.draft.remindAt)sh.draft.remindAt=S.settings.remindAt;return renderSheet();
     case 'more':sh.more=!sh.more;return renderSheet();
     case 'reorderStart':closeSheet();ui.tab='mine';ui.reorder=true;render();return window.scrollTo(0,0);
     case 'save':return saveDraft();
@@ -1277,7 +1289,10 @@ document.addEventListener('change',e=>{
   if(t.id==='f-color')return renderSheet();
   if(t.id==='s-roll')return setSetting('rollover',+t.value);
   if(t.id==='s-sort')return setSetting('sort',t.value);
-  if(t.id==='s-remind'&&/^\d\d:\d\d$/.test(t.value))return setSetting('remindAt',t.value);
+  if(t.id==='s-remind'&&HHMM.test(t.value))return setSetting('remindAt',t.value);
+  if(t.id==='s-qfrom'&&HHMM.test(t.value))return setSetting('quietFrom',t.value);
+  if(t.id==='s-qto'&&HHMM.test(t.value))return setSetting('quietTo',t.value);
+  if(t.id==='f-remind'&&HHMM.test(t.value)){sh.draft.remindAt=t.value;return;}
   if(['f-photo','p-photo','f-photo2','p-photo2'].includes(t.id)&&t.files&&t.files[0]){takePhoto(t.files[0]);t.value='';}
   if(t.id==='s-file'&&t.files&&t.files[0]){const r=new FileReader();r.onload=()=>{sh.restoreText=String(r.result||'');restoreCheck();};r.onerror=()=>{sh.restoreErr="Couldn't read that file.";renderSheet();};r.readAsText(t.files[0]);}
 });
@@ -1311,8 +1326,9 @@ document.addEventListener('keydown',e=>{
   const c=e.target.closest&&e.target.closest('[data-act="card"]');
   if(c&&(e.key==='+'||e.key==='=')){e.preventDefault();addOne(c.dataset.id);}
 });
-let lastPast=null;
-const dayCheck=()=>{const pr=pastRemind();if(today()!==lastT||pr!==lastPast){lastPast=pr;render();refreshSheet();}};
+let lastRem='';
+const remSig=()=>{const t=today(),act=Object.values(S.habits).filter(h=>!h.archived);return dueReminders(act,new Map(act.map(h=>[h.id,evaluate(h,t)])),t).map(h=>h.id).join(',');};
+const dayCheck=()=>{const r=remSig();if(today()!==lastT||r!==lastRem){lastRem=r;render();refreshSheet();}};
 setInterval(dayCheck,30000);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)dayCheck();});
 

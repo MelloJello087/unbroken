@@ -342,3 +342,63 @@ test('archive: with every streak archived, the dashboard still offers the archiv
   assert.match(await page.textContent('#empty'), /No streaks yet/);
   assert.equal(await page.textContent('[data-act="archived"]'), 'Archived (3)');
 });
+
+const setOwnReminder = async (page, id, mode, time) => {
+  await openStreak(page, id); await page.tap('[data-act="edit"]'); await page.tap('[data-act="more"]');
+  await page.tap(`[data-act="rmode"][data-v="${mode}"]`);
+  if (time) { await page.fill('#f-remind', time); await page.dispatchEvent('#f-remind', 'change'); }
+  await page.tap('[data-act="save"]'); await settle(page); await closeSheet(page);
+};
+const reminderText = page => page.$eval('.reminder span', x => x.textContent).catch(() => null);
+
+test('reminders: a streak with its own time reminds even when the default reminder is off, and stops once done', async () => {
+  const { page } = await open();
+  assert.equal(await reminderText(page), null);
+  await setOwnReminder(page, 'h1', 'custom', '00:00');
+  assert.equal(await reminderText(page), 'Read 20 pages is still to do today.');
+  assert.equal((await doc(page, 'h1')).remindMode, 'custom'); assert.equal((await doc(page, 'h1')).remindAt, '00:00');
+  await page.dblclick('.tile[data-id="h1"]'); await settle(page);
+  assert.equal(await reminderText(page), null, 'no reminder once it is done');
+});
+
+test('reminders: a streak set to Off is left out of the default reminder', async () => {
+  const { page } = await open();
+  await page.tap('#btnSettings'); await page.tap('[data-act="toggle"][data-k="remind"]');
+  await page.fill('#s-remind', '00:00'); await page.dispatchEvent('#s-remind', 'change'); await closeSheet(page);
+  assert.equal(await reminderText(page), '2 streaks are still to do today.');
+  await setOwnReminder(page, 'h1', 'off');
+  assert.equal(await reminderText(page), 'Drink water is still to do today.');
+});
+
+test('reminders: quiet hours silence them', async () => {
+  const { page } = await open();
+  await setOwnReminder(page, 'h1', 'custom', '00:00');
+  assert.ok(await reminderText(page));
+  const [from, to] = await page.evaluate(() => { const n = new Date(), p = x => String(x).padStart(2, '0'), a = new Date(n - 36e5), b = new Date(+n + 36e5); return [`${p(a.getHours())}:${p(a.getMinutes())}`, `${p(b.getHours())}:${p(b.getMinutes())}`]; });
+  await page.tap('#btnSettings'); await page.tap('[data-act="toggle"][data-k="quiet"]');
+  await page.fill('#s-qfrom', from); await page.dispatchEvent('#s-qfrom', 'change');
+  await page.fill('#s-qto', to); await page.dispatchEvent('#s-qto', 'change'); await closeSheet(page);
+  assert.equal(await reminderText(page), null);
+  const s = await doc(page, 'settings');
+  assert.deepEqual([s.quiet, s.quietFrom, s.quietTo], [true, from, to]);
+});
+
+test('reminders: never on a day the streak is not scheduled', async () => {
+  const { page } = await open();
+  await openStreak(page, 'h1'); await page.tap('[data-act="edit"]'); await page.tap('[data-act="stype"][data-v="weekdays"]');
+  const dow = await page.evaluate(() => new Date().getDay());
+  const on = await page.$eval(`[data-act="wday"][data-v="${dow}"]`, b => b.getAttribute('aria-pressed') === 'true');
+  if (on) await page.tap(`[data-act="wday"][data-v="${dow}"]`);
+  await page.tap('[data-act="more"]'); await page.tap('[data-act="rmode"][data-v="custom"]'); await page.fill('#f-remind', '00:00'); await page.dispatchEvent('#f-remind', 'change');
+  await page.tap('[data-act="save"]'); await settle(page); await closeSheet(page);
+  assert.equal(await reminderText(page), null);
+});
+
+test('reminders: "Got it" hides the current ones, but a reminder that comes due later still shows', async () => {
+  const { page } = await open();
+  await setOwnReminder(page, 'h2', 'custom', '00:00');
+  assert.equal(await reminderText(page), 'Drink water is still to do today.');
+  await page.tap('[data-act="remindOk"]'); assert.equal(await reminderText(page), null);
+  await setOwnReminder(page, 'h1', 'custom', '00:00');
+  assert.equal(await reminderText(page), 'Read 20 pages is still to do today.');
+});
