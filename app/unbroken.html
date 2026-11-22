@@ -671,6 +671,7 @@ function statusText(h,e,t){
   if(n>=h.goal)return n>1&&h.goal===1?`Done ×${n} today`:'Done today';
   if(n>0)return `${n} of ${h.goal} ${h.unit||'times'}`;
   if(e.dueToday)return e.cur?'Due today':'Start today';
+  if(h.sched.type==='weekdays')return 'Not scheduled today';
   if(e.next!=null)return 'Next: '+relDay(e.next,t);
   return 'Not due today';
 }
@@ -859,6 +860,7 @@ function detailHTML(h,ro,pid){
   else if(done) line=n>1?`Done today, ${n} times.`:'Done for today.';
   else if(rest) line='Rest day. The streak is paused, not broken.';
   else if(e.dueToday) line=e.cur?`Check in today to make it ${e.cur+1}.`:'Check in today to start a streak.';
+  else if(h.sched.type==='weekdays')line=e.next!=null?`Not scheduled today. Next: ${relDay(e.next,t)}.`:'Not scheduled today.';
   else line=e.next!=null?`Not due today. Next: ${relDay(e.next,t)}.`:'Not due today.';
   const stats=[['Best',`${e.best} ${uw(e.unit,e.best)}`],['Hit rate',e.rate==null?'–':Math.round(e.rate*100)+'%'],['Days done',String(e.total)]];
   if(h.freezes) stats.push(['Free misses left',`${e.freezesLeft} of ${h.freezes}`]);

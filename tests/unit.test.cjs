@@ -181,3 +181,22 @@ test('reminder settings: old saves get safe defaults; bad times are ignored', ()
   assert.deepEqual([s.quiet, s.quietFrom, s.quietTo], [false, '22:00', '07:00']);
   assert.equal(M.normSettings({ quietFrom: '7pm' }).quietFrom, '22:00');
 });
+
+test('scheduling: unscheduled time never breaks a streak, for all five schedule types', () => {
+  // Today is Wednesday 18 Nov. Each streak was kept on every day it was required, with long unscheduled gaps.
+  const cases = [
+    ['every day, with rest days in the gaps', { sched: { type: 'daily' }, start: k(4), log: days(4, 2, 0), skip: { [k(3)]: 1, [k(1)]: 1 } }, 3],
+    ['certain weekdays (Mondays only)', { sched: { type: 'weekdays', days: [1] }, start: '2026-11-02', log: { '2026-11-02': 1, '2026-11-09': 1, '2026-11-16': 1 } }, 3],
+    ['every few days (every 5)', { sched: { type: 'interval', every: 5 }, start: k(14), log: days(14, 10, 5, 1) }, 4],
+    ['times a week (once)', { sched: { type: 'perWeek', times: 1 }, start: '2026-11-02', log: { '2026-11-06': 1, '2026-11-09': 1 } }, 2],
+    ['times a month (once)', { sched: { type: 'perMonth', times: 1 }, start: '2026-09-01', log: { '2026-09-30': 1, '2026-10-01': 1 } }, 2],
+  ];
+  for (const [name, o, want] of cases) { const e = ev(habit(o)); assert.equal(e.cur, want, name); assert.equal([...e.st.values()].includes('missed'), false, name + ': nothing marked missed'); }
+});
+test('scheduling: a calm message on days a streak is not scheduled', () => {
+  const thu = load({ now: '2026-11-19T12:00:00' });
+  const h = thu.normHabit({ id: 'h', name: 'x', sched: { type: 'weekdays', days: [1, 3, 5] }, start: '2026-11-16', log: { '2026-11-16': 1, '2026-11-18': 1 } });
+  assert.equal(thu.statusText(h, thu.evaluate(h, thu.today()), thu.today()), 'Not scheduled today');
+  const i = thu.normHabit({ id: 'i', name: 'x', sched: { type: 'interval', every: 3 }, start: '2026-11-18', log: { '2026-11-18': 1 } });
+  assert.equal(thu.statusText(i, thu.evaluate(i, thu.today()), thu.today()), 'Next: Saturday');
+});

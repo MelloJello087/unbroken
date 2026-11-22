@@ -462,3 +462,14 @@ test('drag to reorder: dragging while sorted by name switches to "My order" so t
   assert.equal((await doc(page, 'settings')).sort, 'manual');
   assert.deepEqual(await order(page), ['Read 20 pages', 'Drink water', 'Run']);
 });
+
+test('scheduling: a streak not scheduled today says so calmly, on the card and its page', async () => {
+  const { page } = await open();
+  await openStreak(page, 'h1'); await page.tap('[data-act="edit"]'); await page.tap('[data-act="stype"][data-v="weekdays"]');
+  const dow = await page.evaluate(() => new Date().getDay());
+  if (await page.$eval(`[data-act="wday"][data-v="${dow}"]`, b => b.getAttribute('aria-pressed') === 'true')) await page.tap(`[data-act="wday"][data-v="${dow}"]`);
+  await page.tap('[data-act="save"]'); await settle(page);
+  assert.match(await page.textContent('.line'), /^Not scheduled today\. Next: /);
+  await closeSheet(page);
+  assert.equal(await page.textContent('.tile[data-id="h1"] .meta'), 'Not scheduled today');
+});
