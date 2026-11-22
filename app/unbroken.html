@@ -147,6 +147,9 @@ div.card{cursor:default}
 .mv{display:flex;gap:var(--s2);grid-column:span 2;justify-self:end}
 .arch-link{display:flex;justify-content:center;margin-top:var(--s5)}
 .arch-link .btn{color:var(--ink-2)}
+.lifted{position:relative;z-index:5;transition:none!important;box-shadow:var(--shadow-float);border-radius:var(--r-md)}
+.card.lifted{background:var(--surface)}
+body.dragging{-webkit-user-select:none;user-select:none;cursor:grabbing}
 .hidden-note{font:var(--t-sm);color:var(--ink-2);text-align:center;margin-top:var(--s3)}
 .link{background:none;border:none;padding:var(--s1);font:var(--t-sm);font-weight:600;color:var(--accent);cursor:pointer;text-decoration:underline;text-underline-offset:3px}
 
@@ -1189,6 +1192,54 @@ function restoreApply(){
 }
 
 /* ---------- Events ---------- */
+/* ---------- Drag to reorder ---------- */
+const DRAG={el:null,timer:0,x:0,y:0,ox:0,oy:0,on:false,pid:null,suppress:false};
+function dragCancel(){clearTimeout(DRAG.timer);DRAG.timer=0;if(!DRAG.on)DRAG.el=null;}
+document.addEventListener('pointerdown',e=>{
+  if(ui.reorder||ui.tab!=='mine'||e.button>0)return;
+  const el=e.target.closest&&e.target.closest('[data-act="card"]');if(!el)return;
+  DRAG.el=el;DRAG.x=e.clientX;DRAG.y=e.clientY;DRAG.ox=DRAG.oy=0;DRAG.pid=e.pointerId;
+  clearTimeout(DRAG.timer);
+  DRAG.timer=setTimeout(()=>{if(!DRAG.el)return;DRAG.on=true;DRAG.suppress=true;clearTimeout(tapT);tapT=null;tapId=null;
+    DRAG.el.classList.add('lifted');document.body.classList.add('dragging');try{navigator.vibrate&&navigator.vibrate(10);}catch(x){}},450);
+});
+document.addEventListener('pointermove',e=>{
+  if(!DRAG.el||e.pointerId!==DRAG.pid)return;
+  const dx=e.clientX-DRAG.x,dy=e.clientY-DRAG.y;
+  if(!DRAG.on){if(Math.hypot(dx,dy)>8)dragCancel();return;}
+  const el=DRAG.el,box=el.parentElement;
+  el.style.transform=`translate(${dx+DRAG.ox}px,${dy+DRAG.oy}px) scale(1.02)`;
+  el.style.pointerEvents='none';const under=document.elementFromPoint(e.clientX,e.clientY);el.style.pointerEvents='';
+  const tgt=under&&under.closest('[data-act="card"]');
+  if(tgt&&tgt!==el&&tgt.parentElement===box){
+    const kids=[...box.children],after=kids.indexOf(tgt)>kids.indexOf(el);
+    el.style.transform='';const n0=el.getBoundingClientRect();
+    box.insertBefore(el,after?tgt.nextSibling:tgt);
+    const n1=el.getBoundingClientRect();DRAG.ox+=n0.left-n1.left;DRAG.oy+=n0.top-n1.top;
+    el.style.transform=`translate(${dx+DRAG.ox}px,${dy+DRAG.oy}px) scale(1.02)`;
+  }
+});
+function dragEnd(){
+  clearTimeout(DRAG.timer);DRAG.timer=0;
+  const el=DRAG.el,was=DRAG.on;DRAG.el=null;DRAG.on=false;
+  if(!el||!was)return;
+  el.classList.remove('lifted');el.style.transform='';document.body.classList.remove('dragging');
+  const ids=[...el.parentElement.children].map(x=>x.dataset.id).filter(id=>S.habits[id]);
+  const slots=ids.map(id=>S.habits[id].order).sort((a,b)=>a-b);
+  if(new Set(slots).size<slots.length){const all=Object.values(S.habits).sort((a,b)=>a.order-b.order);all.forEach((h,n)=>{if(h.order!==n+1){h.order=n+1;persist(h.id,clean(h));}});return dragEnd2(ids);}
+  dragEnd2(ids,slots);
+}
+function dragEnd2(ids,slots){
+  slots=slots||ids.map(id=>S.habits[id].order).sort((a,b)=>a-b);
+  ids.forEach((id,n)=>{const h=S.habits[id];if(h.order!==slots[n]){h.order=slots[n];persist(id,clean(h));}});
+  if(S.settings.sort!=='manual'){S.settings.sort='manual';persist('settings',{...S.settings});toast('Now sorted by your order');}
+  render();syncPublic();
+}
+document.addEventListener('pointerup',e=>{if(DRAG.el&&e.pointerId===DRAG.pid)dragEnd();});
+document.addEventListener('pointercancel',e=>{if(DRAG.el&&e.pointerId===DRAG.pid){if(DRAG.on)dragEnd();else dragCancel();}});
+document.addEventListener('touchmove',e=>{if(DRAG.on)e.preventDefault();},{passive:false});
+document.addEventListener('contextmenu',e=>{if(e.target.closest&&e.target.closest('[data-act="card"]'))e.preventDefault();});
+document.addEventListener('click',e=>{if(DRAG.suppress){DRAG.suppress=false;e.stopPropagation();e.preventDefault();}},true);
 let tapT=null,tapId=null,tapAt=0;
 function cardTap(id){
   const now=performance.now();

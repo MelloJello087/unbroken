@@ -74,7 +74,7 @@ Control heights: `--h-sm` 36px, `--h-md` 44px (the default; every tap target is 
 
 ## Motion
 
-`--fast` 120ms for presses, `--base` 200ms for state changes, `--slow` 280ms for sheets opening (180ms closing). One easing curve, `--ease`; nothing overshoots or bounces. Buttons and tiles dip to 98% (`--press`) when pressed; list rows tint instead. Sheets slide up and back down; screens fade in when you switch tabs. A double-tap shows a small "+1" label that rises and fades; reaching a day's goal fades in the check. Everything respects "reduce motion".
+`--fast` 120ms for presses, `--base` 200ms for state changes, `--slow` 280ms for sheets opening (180ms closing). One easing curve, `--ease`; nothing overshoots or bounces. Buttons and tiles dip to 98% (`--press`) when pressed; list rows tint instead. Sheets slide up and back down; screens fade in when you switch tabs. A double-tap shows a small "+1" label that rises and fades; reaching a day's goal fades in the check. Pressing and holding a streak for about half a second lifts it (scaled to 102% with the sheet shadow) so it can be dragged; it follows the finger with no animation and drops in place. Everything respects "reduce motion".
 
 ## Components
 

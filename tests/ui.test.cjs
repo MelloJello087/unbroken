@@ -402,3 +402,63 @@ test('reminders: "Got it" hides the current ones, but a reminder that comes due 
   await setOwnReminder(page, 'h1', 'custom', '00:00');
   assert.equal(await reminderText(page), 'Read 20 pages is still to do today.');
 });
+
+const centre = (page, sel) => page.$eval(sel, el => { const r = el.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; });
+async function touchDrag(page, from, to, { hold = 600, steps = 8 } = {}) {
+  const cdp = await page.context().newCDPSession(page);
+  const t = (type, x, y) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: type === 'touchEnd' ? [] : [{ x, y }] });
+  await t('touchStart', from[0], from[1]); await page.waitForTimeout(hold);
+  for (let i = 1; i <= steps; i++) { await t('touchMove', from[0] + (to[0] - from[0]) * i / steps, from[1] + (to[1] - from[1]) * i / steps); await page.waitForTimeout(30); }
+  await t('touchEnd'); await page.waitForTimeout(400);
+}
+const order = page => page.$$eval('#list .tile .nm, #list .card .nm', x => x.map(t => t.textContent));
+
+test('drag to reorder (touch): press and hold, then drag; the new order is saved and nothing opens', async () => {
+  const { page, errors } = await open();
+  assert.deepEqual(await order(page), ['Read 20 pages', 'Drink water', 'Run']);
+  await touchDrag(page, await centre(page, '.tile[data-id="h1"]'), (await centre(page, '.tile[data-id="h2"]')).map((v, i) => v + (i === 0 ? 30 : 0)));
+  await settle(page);
+  assert.deepEqual(await order(page), ['Drink water', 'Read 20 pages', 'Run']);
+  assert.ok((await doc(page, 'h1')).order > (await doc(page, 'h2')).order);
+  assert.equal(await page.isVisible('#sheet'), false, 'letting go after a hold does not open the streak');
+  assert.equal(await page.$$eval('.lifted', x => x.length), 0);
+  assert.equal((await doc(page, 'h1')).log[(await page.evaluate(() => new Date().toISOString().slice(0, 10)))], undefined, 'and nothing was counted');
+  noErrors(errors);
+});
+
+test('drag to reorder (mouse): works on a computer too', async () => {
+  const { page } = await open({ device: 'Desktop Chrome' });
+  const [x1, y1] = await centre(page, '.tile[data-id="h1"]'), [x2, y2] = await centre(page, '.tile[data-id="h2"]');
+  await page.mouse.move(x1, y1); await page.mouse.down(); await page.waitForTimeout(600);
+  for (let i = 1; i <= 8; i++) { await page.mouse.move(x1 + (x2 + 30 - x1) * i / 8, y1 + (y2 - y1) * i / 8); await page.waitForTimeout(30); }
+  await page.mouse.up(); await settle(page);
+  assert.deepEqual(await order(page), ['Drink water', 'Read 20 pages', 'Run']);
+  assert.equal(await page.isVisible('#sheet'), false);
+});
+
+test('drag to reorder: a quick swipe scrolls instead of lifting a card', async () => {
+  const { page } = await open();
+  await touchDrag(page, await centre(page, '.tile[data-id="h1"]'), await centre(page, '.tile[data-id="h2"]'), { hold: 50 });
+  await settle(page);
+  assert.deepEqual(await order(page), ['Read 20 pages', 'Drink water', 'Run']);
+  assert.equal(await page.$$eval('.lifted', x => x.length), 0);
+});
+
+test('drag to reorder: holding without moving and letting go does nothing', async () => {
+  const { page } = await open();
+  const p = await centre(page, '.tile[data-id="h1"]');
+  await touchDrag(page, p, p, { steps: 1 });
+  await settle(page);
+  assert.equal(await page.isVisible('#sheet'), false);
+  assert.deepEqual(await order(page), ['Read 20 pages', 'Drink water', 'Run']);
+});
+
+test('drag to reorder: dragging while sorted by name switches to "My order" so the result stays put', async () => {
+  const { page } = await open();
+  await page.tap('#btnSettings'); await page.selectOption('#s-sort', 'name'); await closeSheet(page);
+  assert.deepEqual(await order(page), ['Drink water', 'Read 20 pages', 'Run']);
+  await touchDrag(page, await centre(page, '.tile[data-id="h2"]'), (await centre(page, '.tile[data-id="h1"]')).map((v, i) => v + (i === 0 ? 30 : 0)));
+  await settle(page);
+  assert.equal((await doc(page, 'settings')).sort, 'manual');
+  assert.deepEqual(await order(page), ['Read 20 pages', 'Drink water', 'Run']);
+});
