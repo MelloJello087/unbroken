@@ -15,7 +15,9 @@ fi
 {
   printf '<!doctype html>\n<html lang="en"><head><meta charset="utf-8">\n'
   printf '<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">\n'
-  printf '<meta name="theme-color" content="#0f1a12">\n'
+  printf '<meta name="theme-color" content="#0f1712">\n'
+  icon=$(sed -e 's/fill="currentColor"/fill="%23e8efe6"/g' -e '1s/^<svg /<svg style="background:%230f1712" /' assets/motif-mark.svg | tr -d '\n' | sed 's/"/%22/g;s/#/%23/g;s/</%3C/g;s/>/%3E/g')
+  printf '<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%s">\n' "$icon"
   printf '<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}img{max-width:100%%}[hidden]{display:none!important}</style>\n'
   [ -n "$config" ] && printf '%s\n' "$config"
   printf '</head><body>\n'

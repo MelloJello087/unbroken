@@ -1,10 +1,14 @@
-# Unbroken design system
+# Motif design system
 
 Every screen is built from the pieces below. If something new is needed, add it here first, then use it.
 
 ## Idea
 
-Unbroken is a log of small, repeated acts. The look borrows from a field notebook: flat paper surfaces, thin ruled lines, one ink color for text and one accent for action. Decoration comes from the user's own content (their photos and streak colors) and from one signature element, **the chain**: linked squares that fill in as days are done. The chain appears in the logo, on every streak, and in the calendar. Nothing else glows, fades or floats.
+Motif is a log of small, repeated acts: the patterns you keep. The look borrows from a field notebook: flat paper surfaces, thin ruled lines, one ink color for text and one accent for action. Decoration comes from the user's own content (their photos and streak colors) and from one signature element, **the chain**: linked squares that fill in as days are done. The chain appears on every streak and in the calendar. Nothing glows, fades or floats.
+
+## Logo
+
+The mark is a serif **M** with a four-point star above it, in `assets/motif-mark.svg` (the original artwork is `assets/motif-logo-original.png`). In the app the M uses `--ink` and the star uses `--accent`, so it fits every theme. Use it flat: no glow, outline or gradient. Keep clear space of at least half the mark's width around it. Next to the wordmark "Motif", set the mark 24px tall with a 10px gap.
 
 ## Color
 

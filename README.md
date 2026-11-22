@@ -1,4 +1,6 @@
-# Unbroken
+# Motif
+
+![Motif](assets/motif-mark.svg)
 
 A streak tracker. Give each streak a photo and a title, double-tap it whenever you do it, and keep the chain going. Add friends to follow each other's streaks.
 
