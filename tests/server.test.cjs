@@ -131,3 +131,18 @@ async function appHelpers() {
   };
   return (helpers = { build, openApp });
 }
+
+test('live updates: a friend sees a new profile within seconds, without reloading', { skip }, async () => {
+  const { build, openApp } = await appHelpers();
+  await build();
+  const a = await openApp(), b = await openApp();
+  for (const [p, who] of [[a.page, 'la'], [b.page, 'lb']]) {
+    await p.tap('[data-act="authMode"][data-v="signup"]'); await p.fill('#a-email', email(who)); await p.fill('#a-pw', PW); await p.fill('#a-pw2', PW); await p.tap('#authForm button[type=submit]');
+    await p.waitForSelector('.empty-card', { timeout: 20000 });
+  }
+  await b.page.tap('#tabFriends'); await b.page.waitForTimeout(3000);
+  const name = 'Live ' + RUN.slice(-4);
+  await a.page.tap('#tabFriends'); await a.page.tap('.join [data-act="profileEdit"]'); await a.page.fill('#p-name', name); await a.page.tap('[data-act="psave"]');
+  await b.page.waitForSelector(`.prow:has-text("${name}")`, { timeout: 15000 });
+  assert.deepEqual([...a.errors, ...b.errors], []);
+});

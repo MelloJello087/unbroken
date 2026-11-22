@@ -1452,9 +1452,12 @@ function shimDb(uid){
   const fetchCol=async r=>{let q=sb.from(r.t).select(r.key+',body');for(const [k,v] of Object.entries(r.where))q=q.eq(k,v);const {data,error}=await q;if(error)fail(error);
     const docs=(data||[]).map(x=>({id:String(x[r.key]),exists:true,data:()=>x.body,metadata:meta}));return {docs,size:docs.length,empty:!docs.length,metadata:meta,docChanges:()=>[]};};
   const notify=()=>{for(const l of listeners)l();};
+  const live=(r,run)=>{if(r.t==='user_docs'||!sb.channel)return null;let t;try{return sb.channel('motif-'+r.t+'-'+(r.where.user_id||'all')+'-'+Math.random().toString(36).slice(2,7))
+    .on('postgres_changes',{event:'*',schema:'public',table:r.t,...(r.where.user_id?{filter:'user_id=eq.'+r.where.user_id}:{})},()=>{clearTimeout(t);t=setTimeout(run,300);}).subscribe();}catch(e){return null;}};
   const col=path=>{const r=route(path);return {path,doc:id=>doc(path+'/'+id),get:()=>fetchCol(r),
-    onSnapshot(next){let dead=false;const run=()=>fetchCol(r).then(x=>{if(!dead)next(x);}).catch(()=>{});listeners.add(run);run();const iv=setInterval(()=>{if(!document.hidden)run();},45000);
-      return ()=>{dead=true;listeners.delete(run);clearInterval(iv);};}};};
+    onSnapshot(next){let dead=false;const run=()=>fetchCol(r).then(x=>{if(!dead)next(x);}).catch(()=>{});listeners.add(run);run();
+      const iv=setInterval(()=>{if(!document.hidden)run();},r.t==='user_docs'?20000:45000),ch=live(r,run);
+      return ()=>{dead=true;listeners.delete(run);clearInterval(iv);if(ch)try{sb.removeChannel(ch);}catch(e){}};}};};
   const doc=path=>{const r=route(path);
     return {path,id:r.id,
       set:async body=>{const {error}=await sb.from(r.t).upsert({...r.where,[r.key]:r.id,body,updated_at:new Date().toISOString()});if(error)fail(error);notify();},
