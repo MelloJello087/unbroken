@@ -149,6 +149,7 @@ div.card{cursor:default}
 .arch-link .btn{color:var(--ink-2)}
 .lifted{position:relative;z-index:5;transition:none!important;box-shadow:var(--shadow-float);border-radius:var(--r-md)}
 .card.lifted{background:var(--surface)}
+.tile.lifted{background:var(--bg);outline:var(--s2) solid var(--bg)}
 body.dragging{-webkit-user-select:none;user-select:none;cursor:grabbing}
 .hidden-note{font:var(--t-sm);color:var(--ink-2);text-align:center;margin-top:var(--s3)}
 .link{background:none;border:none;padding:var(--s1);font:var(--t-sm);font-weight:600;color:var(--accent);cursor:pointer;text-decoration:underline;text-underline-offset:3px}
@@ -1198,6 +1199,7 @@ function restoreApply(){
 const DRAG={el:null,timer:0,x:0,y:0,ox:0,oy:0,on:false,pid:null,suppress:false};
 function dragCancel(){clearTimeout(DRAG.timer);DRAG.timer=0;if(!DRAG.on)DRAG.el=null;}
 document.addEventListener('pointerdown',e=>{
+  DRAG.suppress=false;
   if(ui.reorder||ui.tab!=='mine'||e.button>0)return;
   const el=e.target.closest&&e.target.closest('[data-act="card"]');if(!el)return;
   DRAG.el=el;DRAG.x=e.clientX;DRAG.y=e.clientY;DRAG.ox=DRAG.oy=0;DRAG.pid=e.pointerId;
@@ -1225,6 +1227,7 @@ function dragEnd(){
   clearTimeout(DRAG.timer);DRAG.timer=0;
   const el=DRAG.el,was=DRAG.on;DRAG.el=null;DRAG.on=false;
   if(!el||!was)return;
+  setTimeout(()=>{DRAG.suppress=false;},350);
   el.classList.remove('lifted');el.style.transform='';document.body.classList.remove('dragging');
   const ids=[...el.parentElement.children].map(x=>x.dataset.id).filter(id=>S.habits[id]);
   const slots=ids.map(id=>S.habits[id].order).sort((a,b)=>a-b);

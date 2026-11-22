@@ -473,3 +473,14 @@ test('scheduling: a streak not scheduled today says so calmly, on the card and i
   await closeSheet(page);
   assert.equal(await page.textContent('.tile[data-id="h1"] .meta'), 'Not scheduled today');
 });
+
+test('drag to reorder: after a drag, the very next tap works normally', async () => {
+  const { page } = await open();
+  await touchDrag(page, await centre(page, '.tile[data-id="h1"]'), (await centre(page, '.tile[data-id="h2"]')).map((v, i) => v + (i === 0 ? 30 : 0)));
+  await settle(page);
+  await page.tap('#btnSettings'); await page.waitForTimeout(400);
+  assert.equal(await page.isVisible('#sheet .settings'), true, 'the first tap after a drag was not swallowed');
+  await closeSheet(page);
+  await page.tap('.tile[data-id="h3"]'); await page.waitForTimeout(500);
+  assert.equal(await page.isVisible('#sheet .detail'), true);
+});

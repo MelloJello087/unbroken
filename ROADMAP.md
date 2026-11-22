@@ -1,6 +1,6 @@
 # Motif feature roadmap
 
-Status: **plan approved. Phase 0 complete; Phase 1 waits for the owner's go-ahead.**
+Status: **Phases 0 and 1 complete. Phase 2 waits for the owner's go-ahead.**
 Backup of the working version before any of this: branch `backup/v1.0-before-expansion`.
 
 ## What already exists
@@ -76,7 +76,15 @@ Security review (for D5):
   4. Set the site address in Supabase from `localhost` to the real one.
 - **Know before going public:** "public" profiles and streaks are visible to anyone with an account, and anyone can make one; the photo and word checks run only on the phone until Phase 3's server checks (R7); no account deletion or password reset (B5).
 
-### Phase 1: Core improvements
+### Phase 1: Core improvements (complete)
+
+Done, with tests (82 in total, all passing):
+- Security fixes before going public: the Supabase library is checked against its fingerprint; the site address is set. The leaked-password check needs Supabase Pro; bot protection needs the owner's Cloudflare Turnstile keys.
+- B1 live updates for friends (profiles and shared streaks only); B2 word filter false alarms; B3 hit rate. All fixed.
+- Undo everywhere, the already-done guard, the Archived section, per-streak reminders with quiet hours, drag to reorder, scheduling wording.
+- Found and fixed while testing: the first tap after a drag was being ignored.
+
+The original Phase 1 plan:
 1. **Undo everywhere (S).** Undo after calendar taps and the +/− buttons too, not just double-tap. On a streak that's already done today with a goal of 1, a double-tap asks "Already done today. Add another?" instead of silently counting twice. Statistics update instantly and sync as today.
 2. **Archive on the dashboard (S).** An "Archived (n)" link at the end of the streak list opens the archived section, with Bring back and Delete clearly separated. History and stats are kept.
 3. **Reminders per streak (M).** Each streak gets an optional reminder time, following its own schedule (no reminder on unscheduled days, none once done). Global quiet hours in Settings. The existing app-wide reminder becomes the default. Delivery for now is the in-app reminder bar; phone notifications come with D4. Settings are saved and synced so they work the moment notifications do.
