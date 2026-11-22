@@ -116,8 +116,8 @@ test('the chain: linked squares join across done, free-miss and rest days, not m
   same(M.chainLinks(['done', 'done', 'missed', 'done', 'skip', 'frozen', 'done']), [false, true, false, false, true, true, true]);
   same(M.chainLinks(['done', 'off', 'off', 'done', 'due']), [false, true, true, true, false]);
 });
-test('milestone lists are unchanged', () => {
-  assert.deepEqual([7, 30, 100, 365].filter(n => M.MILE.day.includes(n)), [7, 30, 100, 365]);
+test('milestones: the approved thresholds', () => {
+  same(M.MILESTONES.day, [7, 30, 100, 365]); same(M.MILESTONES.week, [4, 12, 26, 52]); same(M.MILESTONES.count, [10, 50, 100, 250, 500, 1000]);
 });
 
 test('saved data: an old streak with missing fields loads with safe defaults and keeps its history', () => {
@@ -199,4 +199,51 @@ test('scheduling: a calm message on days a streak is not scheduled', () => {
   assert.equal(thu.statusText(h, thu.evaluate(h, thu.today()), thu.today()), 'Not scheduled today');
   const i = thu.normHabit({ id: 'i', name: 'x', sched: { type: 'interval', every: 3 }, start: '2026-11-18', log: { '2026-11-18': 1 } });
   assert.equal(thu.statusText(i, thu.evaluate(i, thu.today()), thu.today()), 'Next: Saturday');
+});
+
+/* ---------- Phase 2 ---------- */
+test('types: old saves become plain streaks with an increment of 1', () => {
+  const h = M.normHabit({ id: 'h', name: 'x' });
+  same([h.kind, h.step, h.period], ['streak', 1, 'day']);
+  const bad = M.normHabit({ id: 'h', name: 'x', kind: 'race', step: -4, period: 'year', goal: 500000 });
+  same([bad.kind, bad.step, bad.period, bad.goal], ['streak', 1, 'day', 99999]);
+});
+test('counter: adds up totals, this week, this month and the best day, and never misses', () => {
+  const e = ev(habit({ kind: 'counter', unit: 'books', start: '2026-10-01', log: { '2026-10-05': 2, '2026-11-02': 1, '2026-11-16': 3, '2026-11-18': 1 } }));
+  same([e.cur, e.sum, e.week, e.month, e.best, e.total, e.today], [7, 7, 4, 5, 3, 4, 1]);
+  assert.equal(e.dueToday, false); assert.equal(e.rate, null);
+  assert.equal([...e.st.values()].includes('missed'), false);
+});
+test('counter: milestones are dated by when the total crossed them', () => {
+  const log = {}; for (let n = 12; n >= 1; n--) log[k(n)] = 5;
+  const e = ev(habit({ kind: 'counter', start: k(12), log }));
+  assert.equal(e.cur, 60); same(Object.keys(e.miles).map(Number), [10, 50]);
+  assert.equal(M.keyOf(e.miles[10]), k(11)); assert.equal(M.keyOf(e.miles[50]), k(3));
+});
+test('goal (daily): the day counts once the target is reached, adding up in increments', () => {
+  const e = ev(habit({ kind: 'goal', goal: 20, unit: 'pages', step: 5, start: k(3), log: { [k(3)]: 20, [k(2)]: 25, [k(1)]: 20, [k(0)]: 10 } }));
+  assert.equal(e.cur, 3); assert.equal(e.today, 10); assert.equal(e.doneToday, false); assert.equal(e.dueToday, true); assert.equal(e.unit, 'day');
+  assert.equal(e.sum, 75);
+});
+test('goal (weekly): counts add up across the week; full weeks make the streak', () => {
+  const e = ev(habit({ kind: 'goal', period: 'week', goal: 100, unit: 'push-ups', start: '2026-11-02',
+    log: { '2026-11-02': 60, '2026-11-05': 40, '2026-11-09': 30, '2026-11-12': 30, '2026-11-14': 50, '2026-11-17': 20 } }));
+  assert.equal(e.unit, 'week'); assert.equal(e.cur, 2);
+  same({ c: e.period.count, t: e.period.target }, { c: 20, t: 100 }); assert.equal(e.doneToday, false); assert.equal(e.dueToday, true);
+  const met = ev(habit({ kind: 'goal', period: 'week', goal: 100, start: '2026-11-16', log: { '2026-11-16': 70, '2026-11-18': 30 } }));
+  assert.equal(met.doneToday, true); assert.equal(met.cur, 1);
+});
+test('goal (weekly): a week short of the target breaks the streak', () => {
+  const e = ev(habit({ kind: 'goal', period: 'week', goal: 100, start: '2026-11-02', log: { '2026-11-02': 100, '2026-11-09': 40 } }));
+  assert.equal(e.cur, 0); assert.equal(e.best, 1);
+});
+test('milestones: a 7-day streak is dated by the 7th day, and stays earned after the streak breaks', () => {
+  const e = ev(habit({ start: k(20), log: days(...range(20, 10), 1) }));
+  assert.equal(M.keyOf(e.miles[7]), k(14)); assert.equal(e.cur, 1); assert.equal(e.best, 11);
+  same(Object.keys(e.miles).map(Number), [7]);
+});
+test('milestones: weekly streaks use weeks (4, 12, 26, 52)', () => {
+  const log = {}; for (let w = 0; w < 5; w++) for (const d of [0, 2, 4]) log[M.keyOf(M.dnOf('2026-10-12') + w * 7 + d)] = 1;
+  const e = ev(habit({ sched: { type: 'perWeek', times: 3 }, start: '2026-10-12', log }));
+  assert.equal(e.cur, 5); same(Object.keys(e.miles).map(Number), [4]);
 });

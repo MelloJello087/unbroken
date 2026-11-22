@@ -474,7 +474,8 @@ const PRESETS=[['📚','#5f8f3e'],['💧','#3c8d8a'],['🏃','#cf7a3a'],['🧘',
 const AVATARS=[['🌲','#2f7d5b'],['🦊','#cf7a3a'],['🐻','#8c5a3c'],['🌻','#c9a227'],['🍄','#b5523b'],['🦉','#7c6aa3'],['🐢','#5f8f3e'],['🌙','#4f7aa3'],['⛰️','#3c8d8a'],['🌊','#1d6b7c'],['🔥','#a24c2e'],['🐝','#a39a35']];
 const SCHED=[['daily','Every day'],['weekdays','Certain days'],['interval','Every few days'],['perWeek','Times a week'],['perMonth','Times a month']];
 const DEF={remind:true,remindAt:'07:00',quiet:false,quietFrom:'22:00',quietTo:'07:00',theme:'forest',weekStart:1,rollover:0,layout:'grid',sort:'manual',groups:true,hideDone:false,celebrate:true};
-const MILE={day:[3,7,14,21,30,50,75,100,150,200,250,300,365,500,750,1000],week:[2,4,8,12,26,52,104],month:[3,6,12,24,36]};
+const MILESTONES={day:[7,30,100,365],week:[4,12,26,52],month:[3,6,12,24],count:[10,50,100,250,500,1000]};
+const KINDS=['streak','counter','goal'];
 const HHMM=/^([01]\d|2[0-3]):[0-5]\d$/,HEX=/^#[0-9a-f]{6}$/i, DATE=/^\d{4}-\d\d-\d\d$/, SEG=/^[A-Za-z0-9_\-.~:@+]{1,64}$/, IMG=/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/;
 const sv=p=>`<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${p}</svg>`;
 const I={check:sv('<path d="M5 12.5l4.5 4.5L19 7.5"/>'),plus:sv('<path d="M12 5v14M5 12h14"/>'),minus:sv('<path d="M5 12h14"/>'),x:sv('<path d="M6 6l12 12M18 6L6 18"/>'),left:sv('<path d="M15 6l-6 6 6 6"/>'),right:sv('<path d="M9 6l6 6-6 6"/>'),up:sv('<path d="M6 15l6-6 6 6"/>'),down:sv('<path d="M6 9l6 6 6-6"/>'),moon:sv('<path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/>'),upload:sv('<path d="M12 15V4M7.5 8.5 12 4l4.5 4.5M5 20h14"/>')};
@@ -590,7 +591,8 @@ function normHabit(h){
   const types=SCHED.map(x=>x[0]);
   const o={id:String(h.id),name:String(h.name??'').slice(0,60),icon:String(h.icon||'•').slice(0,16),photo:okImg(h.photo),photoOk:!!h.photoOk,color:HEX.test(h.color)?h.color.toLowerCase():COLORS[0],
     sched:{type:types.includes(s.type)?s.type:'daily',days:Array.isArray(s.days)?[...new Set(s.days.filter(d=>Number.isInteger(d)&&d>=0&&d<7))].sort():[1,3,5],every:clamp((s.every|0)||2,1,60),times:clamp((s.times|0)||3,1,31)},
-    goal:clamp((h.goal|0)||1,1,999),unit:String(h.unit||'').slice(0,20),start:DATE.test(h.start)?h.start:keyOf(today()),freezes:clamp(h.freezes|0,0,9),
+    kind:KINDS.includes(h.kind)?h.kind:'streak',step:clamp((h.step|0)||1,1,1000),period:h.period==='week'?'week':'day',
+    goal:clamp((h.goal|0)||1,1,99999),unit:String(h.unit||'').slice(0,20),start:DATE.test(h.start)?h.start:keyOf(today()),freezes:clamp(h.freezes|0,0,9),
     group:String(h.group||'').slice(0,30),remindMode:['default','custom','off'].includes(h.remindMode)?h.remindMode:'default',remindAt:typeof h.remindAt==='string'&&HHMM.test(h.remindAt)?h.remindAt:'',note:String(h.note||'').slice(0,300),archived:!!h.archived,hidden:!!h.hidden,order:Number.isFinite(h.order)?h.order:0,created:Number.isFinite(h.created)?h.created:Date.now(),log:{},skip:{}};
   if(h.log&&typeof h.log==='object') for(const [k,v] of Object.entries(h.log)) if(DATE.test(k)&&v>0) o.log[k]=Math.min(9999,Math.floor(v));
   if(h.skip&&typeof h.skip==='object') for(const k of Object.keys(h.skip)) if(DATE.test(k)&&h.skip[k]) o.skip[k]=1;
@@ -602,46 +604,56 @@ function newHabit(p={}){
 
 /* ---------- Streak engine ---------- */
 function evaluate(h,t=today()){
-  const goal=h.goal,type=h.sched.type,log=h.log,skip=h.skip,s=dnOf(h.start),st=new Map(),used={};
+  const kind=h.kind||'streak',goal=h.goal,log=h.log,skip=h.skip,s=dnOf(h.start),st=new Map(),used={},miles={};
+  const r={st,kind,miles};
+  if(kind==='counter'){
+    const ws=weekStartOf(t),ms=monthStartOf(t);let sum=0,days=0,bestDay=0,week=0,month=0;
+    for(const k of Object.keys(log).sort()){const d=dnOf(k),n=log[k];if(d>t)continue;const before=sum;sum+=n;days++;bestDay=Math.max(bestDay,n);
+      if(d>=ws)week+=n;if(d>=ms)month+=n;st.set(d,'done');for(const m of MILESTONES.count)if(before<m&&sum>=m&&!(m in miles))miles[m]=d;}
+    return Object.assign(r,{unit:'count',cur:sum,sum,best:bestDay,total:days,week,month,today:log[keyOf(t)]||0,rate:null,doneToday:false,dueToday:false,freezesLeft:0,mileList:MILESTONES.count});
+  }
+  const type=kind==='goal'?(h.period==='week'?'goalWeek':'daily'):h.sched.type;
   const fwin=d=>type==='perMonth'?keyOf(d).slice(0,4):keyOf(d).slice(0,7);
   const canFreeze=d=>(used[fwin(d)]||0)<h.freezes, useFreeze=d=>{const k=fwin(d);used[k]=(used[k]||0)+1;};
-  let cur=0,best=0,hit=0,miss=0,total=0;
-  const r={st};
-  if(type==='perWeek'||type==='perMonth'){
-    const wk=type==='perWeek',times=h.sched.times;
+  let cur=0,best=0,hit=0,miss=0,total=0,sum=0;
+  const up=(d,list)=>{cur++;best=Math.max(best,cur);if(list.includes(cur)&&!(cur in miles))miles[cur]=d;};
+  for(const k in log)if(dnOf(k)<=t)sum+=log[k];
+  if(type==='perWeek'||type==='perMonth'||type==='goalWeek'){
+    const wk=type!=='perMonth',times=h.sched.times,list=MILESTONES[wk?'week':'month'];
     let p=wk?weekStartOf(s):monthStartOf(s);
     while(p<=t){
       const pe=wk?p+6:monthEndOf(p),a=Math.max(p,s);let c=0,sk=0;
       for(let d=a;d<=Math.min(pe,t);d++){const k=keyOf(d),n=log[k]||0;
+        if(type==='goalWeek'){c+=n;if(n>0)total++;st.set(d,n>0?'done':skip[k]?'skip':'open');continue;}
         if(n>=goal){c++;total++;st.set(d,'done');}else if(skip[k]){sk++;st.set(d,'skip');}else st.set(d,n>0?'partial':'open');}
-      const target=Math.min(times,pe-a+1-sk),isCur=pe>=t;
+      const target=type==='goalWeek'?goal:Math.min(times,pe-a+1-sk),isCur=pe>=t;
       if(target<=0){}
-      else if(c>=target){cur++;hit++;best=Math.max(best,cur);}
+      else if(c>=target){up(Math.min(pe,t),list);hit++;}
       else if(isCur){}
       else if(cur>0&&canFreeze(pe)){useFreeze(pe);}
       else{miss++;cur=0;}
       if(isCur) r.period={count:c,target:Math.max(0,target),start:p,end:pe};
       p=pe+1;
     }
-    r.unit=wk?'week':'month';
+    r.unit=wk?'week':'month';r.mileList=list;
     r.dueToday=!!(r.period&&r.period.count<r.period.target);
   }else{
-    const N=h.sched.every,days=h.sched.days;let anchor=s-1;
+    const N=h.sched.every,days=h.sched.days,list=MILESTONES.day;let anchor=s-1;
     const req=d=>type==='daily'?true:type==='weekdays'?days.includes(dow(d)):d-anchor>=N;
     for(let d=s;d<=t;d++){const k=keyOf(d),n=log[k]||0;
-      if(n>=goal){cur++;total++;if(type!=='weekdays'||days.includes(dow(d)))hit++;best=Math.max(best,cur);anchor=d;st.set(d,'done');continue;}
+      if(n>=goal){up(d,list);total++;if(type!=='weekdays'||days.includes(dow(d)))hit++;anchor=d;st.set(d,'done');continue;}
       if(skip[k]){st.set(d,'skip');if(type==='interval')anchor++;continue;}
       if(!req(d)){st.set(d,n>0?'partial':'off');continue;}
       if(d===t){st.set(d,n>0?'partial':'due');r.dueToday=true;continue;}
       if(cur>0&&canFreeze(d)){useFreeze(d);st.set(d,'frozen');if(type==='interval')anchor=d;continue;}
       st.set(d,'missed');miss++;cur=0;if(type==='interval')anchor=d;
     }
-    r.unit='day';
+    r.unit='day';r.mileList=list;
     if(type==='interval') r.next=Math.max(anchor+N,t+1);
     else if(type==='weekdays'&&days.length){let d=t+1;while(!days.includes(dow(d)))d++;r.next=d;}
   }
-  r.cur=cur;r.best=best;r.total=total;r.rate=hit+miss?hit/(hit+miss):null;
-  r.doneToday=(log[keyOf(t)]||0)>=goal;
+  r.cur=cur;r.best=best;r.total=total;r.sum=sum;r.rate=hit+miss?hit/(hit+miss):null;r.today=log[keyOf(t)]||0;
+  r.doneToday=type==='goalWeek'?!!(r.period&&r.period.count>=r.period.target):r.today>=goal;
   r.freezesLeft=Math.max(0,h.freezes-(used[fwin(t)]||0));
   return r;
 }
@@ -663,10 +675,15 @@ function schedText(h){
     default:return 'Every day';
   }
 }
-const goalText=h=>h.goal>1?` · ${h.goal} ${h.unit||'times'} a day`:'';
+const goalText=h=>h.kind==='streak'&&h.goal>1?` · ${h.goal} ${h.unit||'times'} a day`:'';
+const stepOf=h=>h.kind!=='streak'||h.goal>1?h.step:1;
+const amt=(h,n)=>`${n} ${h.unit||(n===1?'time':'times')}`;
+const countLabel=(h,e,n)=>e.kind==='counter'?(h.unit||(n===1?'time':'times')):uw(e.unit,n);
 function relDay(d,t){return d===t+1?'tomorrow':d-t<7?DNL[dow(d)]:fmt(d);}
 function statusText(h,e,t){
   const k=keyOf(t),n=h.log[k]||0;
+  if(e.kind==='counter')return n?`+${n} today`:'Nothing yet today';
+  if(e.kind==='goal'&&e.period){const p=e.period;return p.count>=p.target?'Done for the week':`${p.count} of ${amt(h,p.target)} this week`;}
   if(e.period){const p=e.period;if(!p.target)return `Rest ${e.unit}`;if(p.count>=p.target)return `Done for the ${e.unit}`;return `${p.count} of ${p.target} this ${e.unit}`;}
   if(h.skip[k])return 'Rest day';
   if(n>=h.goal)return n>1&&h.goal===1?`Done ×${n} today`:'Done today';
@@ -686,7 +703,8 @@ function avatarHTML(id,cls){
 /* ---------- My streaks ---------- */
 function sorted(active,evs){
   const s=S.settings.sort,dk=h=>{const e=evs.get(h.id);return e.dueToday&&!e.doneToday?0:e.doneToday?1:2;};
-  return [...active].sort((a,b)=>s==='streak'?evs.get(b.id).cur-evs.get(a.id).cur||a.order-b.order:s==='name'?nameOf(a).localeCompare(nameOf(b)):s==='due'?dk(a)-dk(b)||a.order-b.order:a.order-b.order);
+  const sc=h=>{const e=evs.get(h.id);return e.kind==='counter'?-1:e.cur;};
+  return [...active].sort((a,b)=>s==='streak'?sc(b)-sc(a)||a.order-b.order:s==='name'?nameOf(a).localeCompare(nameOf(b)):s==='due'?dk(a)-dk(b)||a.order-b.order:a.order-b.order);
 }
 function groupList(arr){
   const m=new Map();
@@ -846,10 +864,10 @@ function toast(msg,undo,big,label){
   tt=setTimeout(()=>el.classList.remove('show'),undo?5000:2600);
   if(undo) $('#undoBtn').onclick=()=>{el.classList.remove('show');undo();};
 }
-function fx(id,plus,done){
+function fx(id,plus,done){plus=plus===true?1:plus;
   const c=document.querySelector(`[data-card="${CSS.escape(id)}"]`);if(!c)return;
   c.classList.add('pop');if(done)c.classList.add('done-now');setTimeout(()=>c.classList.remove('pop','done-now'),600);
-  if(plus){const b=document.createElement('span');b.className='burst';b.textContent='+1';(c.querySelector('.media')||c).appendChild(b);setTimeout(()=>b.remove(),850);}
+  if(plus){const b=document.createElement('span');b.className='burst';b.textContent='+'+plus;(c.querySelector('.media')||c).appendChild(b);setTimeout(()=>b.remove(),850);}
 }
 
 /* ---------- Sheets ---------- */
@@ -1079,8 +1097,10 @@ function openPerson(id){
 /* ---------- Actions ---------- */
 function commit(h){S.habits[h.id]=h;persist(h.id,clean(h));render();refreshSheet();syncPublic();}
 function cheer(h,before){
-  const a=evaluate(h);if(a.cur<=before.cur)return '';
-  return S.settings.celebrate&&MILE[a.unit].includes(a.cur)?`${a.cur} ${uw(a.unit,a.cur)} in a row: ${nameOf(h)}`:'';
+  if(!S.settings.celebrate)return '';
+  const a=evaluate(h),n=Object.keys(a.miles).map(Number).filter(m=>!(m in before.miles)).pop();
+  if(!n)return '';
+  return `Milestone: ${n} ${countLabel(h,a,n)}${a.kind==='counter'?'':' in a row'} · ${nameOf(h)}`;
 }
 function undoFor(id,k){
   const h=S.habits[id],ln=h.log[k],sk=h.skip[k],st=h.start;
@@ -1089,19 +1109,23 @@ function undoFor(id,k){
 function addOne(id,again){
   const h=S.habits[id];if(!h||h.archived)return;
   const k=keyOf(today()),pn=h.log[k]||0,ps=!!h.skip[k],before=evaluate(h);
-  if(h.goal===1&&pn>=1&&!again){fx(id);return toast(`${nameOf(h)}: already done today`,()=>addOne(id,true),false,'Add again');}
-  h.log[k]=pn+1;delete h.skip[k];commit(h);fx(id,true,pn<h.goal&&pn+1>=h.goal);
-  const n=h.log[k],nm=nameOf(h),big=cheer(h,before);
-  const undo=()=>{const x=S.habits[id];if(!x)return;if(pn)x.log[k]=pn;else delete x.log[k];if(ps)x.skip[k]=1;commit(x);};
-  toast(big||(n===h.goal?`${nm}: done for today`:h.goal>1?`${nm}: ${n} of ${h.goal} ${h.unit||'times'}`:`${nm}: ${n} today`),undo,!!big);
+  if(h.kind==='streak'&&h.goal===1&&pn>=1&&!again){fx(id);return toast(`${nameOf(h)}: already done today`,()=>addOne(id,true),false,'Add again');}
+  const step=stepOf(h),undo=undoFor(id,k);
+  h.log[k]=pn+step;delete h.skip[k];commit(h);
+  const n=h.log[k],nm=nameOf(h),ms=cheer(h,before),after=evaluate(h);
+  fx(id,step,h.kind!=='counter'&&!before.doneToday&&after.doneToday);
+  const msg=h.kind==='counter'?`${nm}: ${amt(h,after.sum)} in all`:after.period&&h.kind==='goal'?`${nm}: ${after.period.count} of ${amt(h,after.period.target)} this week`:
+    n>=h.goal&&pn<h.goal?`${nm}: done for today`:h.goal>1?`${nm}: ${n} of ${amt(h,h.goal)}`:`${nm}: ${n} today`;
+  toast(ms||msg,undo);
 }
-function adjust(id,dl){
-  const h=S.habits[id];if(!h)return;
-  const k=keyOf(today()),n=Math.max(0,(h.log[k]||0)+dl),before=evaluate(h);
+function adjust(id,dir,d){
+  const h=S.habits[id];if(!h)return;d=d==null||d>today()?today():d;
+  const k=keyOf(d),n=Math.max(0,(h.log[k]||0)+dir*stepOf(h)),before=evaluate(h);
   const undo=undoFor(id,k);
-  if(n)h.log[k]=n;else delete h.log[k];if(dl>0)delete h.skip[k];
-  commit(h);const big=cheer(h,before);
-  toast(big||`${nameOf(h)}: ${h.goal>1?`${n} of ${h.goal} ${h.unit||'times'}`:`${n} today`}`,undo,!!big);
+  if(n)h.log[k]=n;else delete h.log[k];if(dir>0)delete h.skip[k];
+  if(d<dnOf(h.start))h.start=k;
+  commit(h);const ms=cheer(h,before),when=d===today()?'today':fmt(d);
+  toast(ms||`${nameOf(h)}: ${h.kind==='streak'&&h.goal===1?`${n} ${when}`:`${amt(h,n)} ${when}`}`,undo);
 }
 function toggleRest(id){
   const h=S.habits[id];if(!h)return;const k=keyOf(today()),undo=undoFor(id,k),was=!!h.skip[k];
