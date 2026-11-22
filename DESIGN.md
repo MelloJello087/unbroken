@@ -30,6 +30,8 @@ Each theme defines the same roles. Components use roles, never raw colors.
 
 Themes: Forest (default, dark green), Moss, Midnight, Ember, Sand, Ocean.
 
+Secondary text (`--ink-2`) and hints (`--ink-3`) stay at about 4.5:1 or better against the page in every theme, so quiet text is still easy to read.
+
 Rules: one filled accent button per screen at most. No gradients, except over a user's photo where text must stay readable, and even there use a solid chip instead where possible. Shadows only on things that sit above the page (sheets, the toast).
 
 ## Type
@@ -83,6 +85,7 @@ Control heights: `--h-sm` 36px, `--h-md` 44px (the default; every tap target is 
 - **Picture section** (new streak and profile): an 88px preview (square, or round for profiles), an Upload button and paste box beside it, the preset grid below. The selected preset gets a 2px ink ring.
 - **Selected options** (frequency, days): filled with `--ink`. Primary actions stay the only accent fill.
 - **Form buttons**: the primary action is the wider button, Cancel a bordered button beside it.
+- **Calendar**: rows 36px tall with 4px gaps. Done days fill with the streak color, missed days are a muted filled square with a hairline edge (the number always stays readable), rest days are dashed, and today has a single ink outline with a bold number.
 - **Sheet**: rises from the bottom with a grab handle, a title on the left, a close button on the right, and a 20px inner margin.
 - **Grouped list** (settings, people, privacy): one bordered card with hairline dividers between rows; each row is at least 52px tall.
 - **Buttons**: primary (filled accent), secondary (surface with a hairline), ghost (text only), danger. Heights 44, or 36 when small.
