@@ -323,6 +323,16 @@ input:focus,textarea:focus,select:focus{outline:none;border-color:var(--accent)}
 .preset{aspect-ratio:1;border-radius:14px;border:none;padding:0;cursor:pointer;font-size:24px;background:linear-gradient(155deg,color-mix(in srgb,var(--hc) 70%,var(--surface)),color-mix(in srgb,var(--hc) 22%,var(--surface)))}
 .preset.round{border-radius:50%}
 .preset[aria-pressed="true"]{box-shadow:0 0 0 2px var(--surface),0 0 0 4px var(--ink)}
+.auth{position:fixed;inset:0;z-index:40;overflow:auto;background:var(--bg);padding:calc(28px + env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) calc(28px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
+.auth-card{max-width:420px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
+.auth-card .tabs{margin:0}
+.pw-row{display:flex;gap:8px;align-items:center}
+.pw-row input{flex:1}
+.pw-rules{list-style:none;margin:2px 0 0;padding:0;display:grid;gap:5px;font-size:13px;color:var(--ink-2)}
+.pw-rules li{display:flex;align-items:center;gap:8px}
+.pw-rules li i{width:14px;height:14px;border-radius:50%;border:1.5px solid var(--miss);flex:none}
+.pw-rules li svg{width:14px;height:14px;flex:none;color:var(--accent)}
+.pw-rules li.ok{color:var(--ink)}
 .more-btn{display:inline-flex;align-items:center;gap:6px;align-self:flex-start;border:none;background:none;padding:6px 2px;font:650 14px var(--f-body);color:var(--ink-2);cursor:pointer}
 .more-btn svg{width:16px;height:16px}
 .more{border-top:1px solid var(--line);padding-top:20px}
@@ -400,12 +410,14 @@ input:focus,textarea:focus,select:focus{outline:none;border-color:var(--accent)}
   <div class="sheet" role="dialog" aria-modal="true" aria-label="Streak" tabindex="-1"><div class="sheet-body" id="sheetBody"></div></div>
 </div>
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
+<div id="auth" class="auth" hidden></div>
 
 <script>
 (() => {
 'use strict';
 /* ---------- Constants ---------- */
-const KEY='unbroken:v1', TABKEY='unbroken:tab', DAY=864e5;
+let KEY='unbroken:v1';
+const TABKEY='unbroken:tab', DAY=864e5;
 const DN=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'], DNL=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'], DL=['S','M','T','W','T','F','S'];
 const MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'], MONL=['January','February','March','April','May','June','July','August','September','October','November','December'];
 const THEMES={forest:['Forest','#0f1a12','#17241a','#8fc46a'],moss:['Moss','#e8ede0','#f7f9f2','#4a7a35'],midnight:['Midnight','#0e1220','#161b2c','#8fb0ff'],ember:['Ember','#1a1310','#241b16','#f0a060'],sand:['Sand','#ece6d8','#faf7ef','#5f6d27'],ocean:['Ocean','#e3edf0','#f6fafb','#1d6b7c']};
@@ -470,7 +482,7 @@ function takePhoto(file){
     const v=await photoCheck(u);if(ui.sheet!==sh)return;sh.photoBusy=false;
     if(v==='bad')sh.photoErr="That photo can't be used here. Please pick a different one.";
     else if(v==='ok'){sh.draft.photo=u;sh.draft.photoOk=true;}
-    else if(prof)sh.photoErr="Profile pictures need a quick safety check, and it couldn't run right now. Try again in a moment.";
+    else if(prof)sh.photoErr=ACCOUNTS?"Your own profile photos are coming soon. Pick one of the pictures below for now.":"Profile pictures need a quick safety check, and it couldn't run right now. Try again in a moment.";
     else{sh.draft.photo=u;sh.draft.photoOk=false;sh.photoNote="This photo couldn't be safety-checked, so only you will see it.";}
     renderSheet();
   }).catch(()=>{if(ui.sheet!==sh)return;sh.photoBusy=false;sh.photoErr="Couldn't read that photo. Try a different one, or take a screenshot of it and use that.";renderSheet();});
@@ -733,7 +745,7 @@ function renderFriends(t){
   let html=`<section class="summary"><p class="eyebrow">Friends</p><h2 class="headline">${fol.length?`Following ${fol.length} ${fol.length===1?'person':'people'}`:'Streaks are better with company'}</h2></section>`;
   if(social.blocked||social.can===false) html+=`<div class="notice">You can see everyone's public streaks, but your access to this page doesn't let you post your own. Ask the person who shared it with you for edit access.</div>`;
   else if(me) html+=`<div class="me-card">${avatarHTML(uid,'av-lg')}<div class="me-t"><b>${esc(displayName(uid))}</b><span>${me.private?'Private. Nobody else sees your streaks.':`Public. ${me.streaks} ${me.streaks===1?'streak':'streaks'} visible to friends.`}</span></div><button class="btn sm" data-act="profileEdit">Edit</button></div>`;
-  else if(social.pReady) html+=`<div class="join"><div><h3>Make your profile</h3><p>Pick a name and a photo. People who use this page can add you and follow your streaks. You can make any streak, or your whole profile, private.</p></div><div><button class="btn primary" data-act="profileEdit">Make my profile</button></div></div>`;
+  else if(social.pReady) html+=`<div class="join"><div><h3>Make your profile</h3><p>Pick a name and a photo. People on Unbroken can add you and follow your streaks. You can make any streak, or your whole profile, private.</p></div><div><button class="btn primary" data-act="profileEdit">Make my profile</button></div></div>`;
   html+='<h2 class="grp">Following</h2>';
   html+=fol.length?fol.sort((a,b)=>displayName(a).localeCompare(displayName(b))).map(id=>followHTML(id,t)).join(''):'<p class="muted-note">Nobody yet. Add people below to follow their streaks.</p>';
   html+='<h2 class="grp">People here</h2>';
@@ -755,7 +767,7 @@ function render(){
   if(ui.tab==='friends')renderFriends(t);else renderMine(t);
   const mb=$('#btnMe');mb.hidden=!social.db;if(social.db){mb.innerHTML=avatarHTML(social.uid);resolveNames([social.uid]);}
   const note=$('#storeNote');let msg,cls='';
-  if(store.mode==='cloud'&&store.ready){msg='Synced to your Claude account.';cls='ok';}
+  if(store.mode==='cloud'&&store.ready){msg=ACCOUNTS?'Synced to your Unbroken account.':'Synced to your Claude account.';cls='ok';}
   else if(store.mode!=='local') msg='Connecting to your account…';
   else msg=store.why==='readonly'?"Saved in this browser only. Your access to this page doesn't include saving to your account.":store.why==='lost'?'Saved in this browser only. The connection to your account dropped. Reload to reconnect.':'Saved in this browser only. Open this page in Claude while signed in to sync across devices.';
   note.className='foot '+cls;note.innerHTML=`<i></i><span>${esc(msg)}</span>`;
@@ -935,6 +947,7 @@ function settingsHTML(){
       ${tg('celebrate','Celebrate milestones','A little fanfare at 7, 30, 100 days and more.')}
     </div></section>
     <section><h3>Archived</h3><div class="set">${archRows}</div></section>
+    ${ACCOUNTS&&acct?`<section><h3>Account</h3><div class="set"><div class="srow"><span class="sl">Logged in<small>${esc(acct.email||'')}</small></span><button type="button" class="btn sm" data-act="logout">Log out</button></div></div></section>`:''}
     <section><h3>Backup</h3><div class="set">
       <div class="srow col"><span class="sl">Save a copy<small>Every streak, photo, check-in and setting, as one file or block of text.</small></span>
         <div class="row">${ui.dl?'<button class="btn sm" data-act="saveFile">Save backup file</button>':''}<button class="btn sm" data-act="copy">Copy backup</button></div>
@@ -1130,6 +1143,7 @@ document.addEventListener('click',e=>{
     case 'stype':{const s=sh.draft.sched;s.type=b.dataset.v;if(s.type==='perWeek')s.times=clamp(s.times,1,7);if(s.type==='interval')s.every=Math.max(2,s.every);if(s.type==='weekdays'&&!s.days.length)s.days=[1,2,3,4,5];return renderSheet();}
     case 'wday':{const s=sh.draft.sched,v=+b.dataset.v;s.days=s.days.includes(v)?s.days.filter(x=>x!==v):[...s.days,v].sort();return renderSheet();}
     case 'step':{const f=b.dataset.f,d=sh.draft,v=(f==='every'||f==='times'?d.sched[f]:d[f])+(+b.dataset.d),c=clamp(v,+b.dataset.min,+b.dataset.max);if(f==='every'||f==='times')d.sched[f]=c;else d[f]=c;return renderSheet();}
+    case 'logout':return logOut();
     case 'remindOk':try{localStorage.setItem(REMKEY,keyOf(today()));}catch(x){}return render();
     case 'preset':{const [ic,c]=PRESETS[+b.dataset.i];Object.assign(sh.draft,{icon:ic,color:c,photo:'',photoOk:false});sh.photoNote='';sh.photoErr='';return renderSheet();}
     case 'avatar':{const [ic,c]=AVATARS[+b.dataset.i];sh.draft.photo=presetImage(ic,c);sh.draft.photoOk=true;sh.photoErr='';return renderSheet();}
@@ -1368,9 +1382,110 @@ async function connect(){
   render();if(ui.sheet&&ui.sheet.kind==='settings')renderSheet();
 }
 
+/* ---------- Accounts ---------- */
+const CFG=window.UNBROKEN_CONFIG||null;
+const ACCOUNTS=!!(CFG&&CFG.supabaseUrl&&CFG.supabaseKey&&window.supabase&&!(window.claude&&window.claude.use));
+let sb=null,acct=null;
+const PWRULES=[['8 or more characters',p=>p.length>=8],['An uppercase letter',p=>/[A-Z]/.test(p)],['A lowercase letter',p=>/[a-z]/.test(p)],['A number',p=>/[0-9]/.test(p)],['A symbol, like ! # or ?',p=>/[!@#$%^&*()_+\-=\[\]{};'\\:"|<>?,./`~]/.test(p)]];
+const A={mode:'login',email:'',pw:'',pw2:'',show:false,busy:false,err:''};
+function shimDb(uid){
+  const listeners=new Set();
+  const route=path=>{const p=path.split('/');
+    if(p[0]==='data'&&p[1]==='users'&&p[2]===uid&&p.length<=4)return {t:'user_docs',key:'doc_id',where:{user_id:uid},id:p[3]};
+    if(p[0]==='people'&&p.length<=2)return {t:'profiles',key:'user_id',where:{},id:p[1]};
+    if(p[0]==='people'&&p[2]==='streaks'&&p.length<=4)return {t:'public_streaks',key:'habit_id',where:{user_id:p[1]},id:p[3]};
+    throw new TypeError('Unknown path '+path);};
+  const fail=e=>{const m=String((e&&(e.message||e.code))||'');throw {code:/permission|row-level|42501|JWT/i.test(m)?'invalid_argument':'unavailable',message:m};};
+  const meta={fromCache:false,hasPendingWrites:false};
+  const fetchCol=async r=>{let q=sb.from(r.t).select(r.key+',body');for(const [k,v] of Object.entries(r.where))q=q.eq(k,v);const {data,error}=await q;if(error)fail(error);
+    const docs=(data||[]).map(x=>({id:String(x[r.key]),exists:true,data:()=>x.body,metadata:meta}));return {docs,size:docs.length,empty:!docs.length,metadata:meta,docChanges:()=>[]};};
+  const notify=()=>{for(const l of listeners)l();};
+  const col=path=>{const r=route(path);return {path,doc:id=>doc(path+'/'+id),get:()=>fetchCol(r),
+    onSnapshot(next){let dead=false;const run=()=>fetchCol(r).then(x=>{if(!dead)next(x);}).catch(()=>{});listeners.add(run);run();const iv=setInterval(()=>{if(!document.hidden)run();},45000);
+      return ()=>{dead=true;listeners.delete(run);clearInterval(iv);};}};};
+  const doc=path=>{const r=route(path);
+    return {path,id:r.id,
+      set:async body=>{const {error}=await sb.from(r.t).upsert({...r.where,[r.key]:r.id,body,updated_at:new Date().toISOString()});if(error)fail(error);notify();},
+      delete:async()=>{let q=sb.from(r.t).delete().eq(r.key,r.id);for(const [k,v] of Object.entries(r.where))q=q.eq(k,v);const {error}=await q;if(error)fail(error);notify();},
+      collection:p=>col(path+'/'+p)};};
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden)notify();});
+  return {doc,collection:col};
+}
+function useAccount(session){
+  const uid=session.user.id;acct={id:uid,email:session.user.email};
+  const blank=i=>({id:i,name:'',avatarUrl:'',color:'#888',email:null,isMe:i===uid,guest:false});
+  const user={id:async()=>uid,can:async()=>true,canEdit:async()=>false,isOwner:async()=>false,profiles:async ids=>Object.fromEntries([].concat(ids).map(i=>[i,blank(i)])),
+    me:async()=>({id:uid,name:'',avatarUrl:'',color:'#888',email:acct.email,isOwner:false,canEdit:false})};
+  const downloads={save:async({filename,data})=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([data],{type:'application/json'}));a.download=filename;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},1000);return {status:'saved'};}};
+  const db=shimDb(uid);
+  window.claude={use:async n=>n==='db'?db:n==='user'?user:n==='downloads'?downloads:null};
+  KEY='unbroken:v1:'+uid;
+  $('#auth').hidden=true;document.body.classList.remove('locked');
+  ui.hadCache=loadLocal();render();connect();
+}
+function authHTML(){
+  const su=A.mode==='signup',p=A.pw;
+  return `<div class="auth-card" role="dialog" aria-modal="true" aria-labelledby="authTitle">
+    <div class="brand"><svg class="mark" viewBox="0 0 34 22" width="34" height="22" aria-hidden="true"><rect x="2" y="3" width="18" height="16" rx="8" fill="none" stroke="currentColor" stroke-width="3.2"/><rect class="l2" x="14" y="3" width="18" height="16" rx="8" fill="none" stroke-width="3.2"/></svg><h1>Unbroken</h1></div>
+    <h2 id="authTitle" class="headline">${su?'Create your account':'Welcome back'}</h2>
+    <div class="tabs" role="tablist"><button role="tab" data-act="authMode" data-v="login" aria-selected="${!su}">Log in</button><button role="tab" data-act="authMode" data-v="signup" aria-selected="${su}">Create account</button></div>
+    <form class="form" id="authForm" novalidate>
+      <div class="field"><label class="lab" for="a-email">Email</label><input id="a-email" type="email" autocomplete="email" inputmode="email" value="${esc(A.email)}" placeholder="you@example.com"></div>
+      <div class="field"><label class="lab" for="a-pw">Password</label><div class="pw-row"><input id="a-pw" type="${A.show?'text':'password'}" autocomplete="${['current-password','new-password'][+su]}" value="${esc(A.pw)}"><button type="button" class="link" data-act="authShow">${A.show?'Hide':'Show'}</button></div>
+        ${su?`<ul class="pw-rules" id="pwRules">${PWRULES.map(([l,f])=>`<li class="${f(p)?'ok':''}">${f(p)?I.check:'<i></i>'}${l}</li>`).join('')}</ul>`:''}</div>
+      ${su?`<div class="field"><label class="lab" for="a-pw2">Type it again</label><input id="a-pw2" type="${A.show?'text':'password'}" autocomplete="new-password" value="${esc(A.pw2)}"></div>`:''}
+      ${A.err?`<p class="err" role="alert">${esc(A.err)}</p>`:''}
+      <button class="btn primary" type="submit"${A.busy?' disabled':''}>${A.busy?'One moment…':su?'Create account':'Log in'}</button>
+    </form>
+  </div>`;
+}
+function showAuth(){const el=$('#auth');el.innerHTML=authHTML();el.hidden=false;document.body.classList.add('locked');}
+function authError(e){
+  const c=e&&(e.code||e.error_code),m=String((e&&e.message)||'');
+  if(c==='invalid_credentials')return 'That email and password don\'t match. Check them and try again.';
+  if(c==='user_already_exists'||/already registered/i.test(m))return 'That email already has an account. Log in instead.';
+  if(c==='weak_password')return 'That password doesn\'t meet all the rules below.';
+  if(c==='email_address_invalid'||/invalid.*email|email.*invalid/i.test(m))return 'That email address doesn\'t look right.';
+  if(c==='over_request_rate_limit'||e&&e.status===429)return 'Too many tries. Wait a few minutes and try again.';
+  if(/most Unbroken accounts/i.test(m))return m+' Log in to one of them instead.';
+  return 'Something went wrong. Check your connection and try again.';
+}
+async function submitAuth(){
+  const su=A.mode==='signup';A.email=A.email.trim();
+  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(A.email)){A.err='Enter your email address.';return showAuth();}
+  if(su&&!PWRULES.every(([,f])=>f(A.pw))){A.err='Your password needs everything in the list below.';return showAuth();}
+  if(su&&A.pw!==A.pw2){A.err='The two passwords don\'t match.';return showAuth();}
+  if(!A.pw){A.err='Enter your password.';return showAuth();}
+  A.busy=true;A.err='';showAuth();
+  try{
+    const {data,error}=su?await sb.auth.signUp({email:A.email,password:A.pw}):await sb.auth.signInWithPassword({email:A.email,password:A.pw});
+    if(error)throw error;
+    if(!data.session)throw {message:'no session'};
+    A.pw=A.pw2='';A.busy=false;useAccount(data.session);
+  }catch(e){A.busy=false;A.err=authError(e);showAuth();}
+}
+async function logOut(){
+  if(W.pending.size&&store.mode==='cloud'){toast('Saving your latest changes first. Try again in a moment.');for(const id of W.pending.keys())schedule(id,50);return;}
+  try{await sb.auth.signOut();}catch(e){}
+  try{localStorage.removeItem(KEY);}catch(e){}
+  location.reload();
+}
+async function startAccounts(){
+  sb=window.supabase.createClient(CFG.supabaseUrl,CFG.supabaseKey);
+  document.addEventListener('submit',e=>{if(e.target.id==='authForm'){e.preventDefault();submitAuth();}});
+  document.addEventListener('input',e=>{const t=e.target;if(!t.closest||!t.closest('#auth'))return;
+    if(t.id==='a-email')A.email=t.value;if(t.id==='a-pw2')A.pw2=t.value;
+    if(t.id==='a-pw'){A.pw=t.value;const r=$('#pwRules');if(r)r.innerHTML=PWRULES.map(([l,f])=>`<li class="${f(A.pw)?'ok':''}">${f(A.pw)?I.check:'<i></i>'}${l}</li>`).join('');}});
+  document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest('#auth [data-act]');if(!b)return;
+    if(b.dataset.act==='authMode'){A.mode=b.dataset.v;A.err='';showAuth();}
+    if(b.dataset.act==='authShow'){A.show=!A.show;showAuth();}});
+  render();
+  let session=null;try{session=(await sb.auth.getSession()).data.session;}catch(e){}
+  if(session)useAccount(session);else showAuth();
+}
+
 /* ---------- Start ---------- */
-ui.hadCache=loadLocal();
-render();
-connect();
+if(ACCOUNTS)startAccounts();
+else{ui.hadCache=loadLocal();render();connect();}
 })();
 </script>

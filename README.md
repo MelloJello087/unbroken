@@ -10,6 +10,18 @@ A streak tracker. Give each streak a photo and a title, double-tap it whenever y
 - Six themes (dark Forest green by default), a daily reminder time, and backup to a file.
 - Safety: new photos are checked before friends can see them, and rude words are blocked in titles and names.
 
+## Accounts
+
+The published version has real accounts on Supabase: sign up with an email and password, log in, and log out from Settings.
+- Passwords need 8 or more characters, an uppercase letter, a lowercase letter, a number and a symbol. Supabase checks this on its server too.
+- No email confirmation, so people can start right away.
+- At most 5 accounts per network (IP address). Only a salted fingerprint of the address is stored.
+- Database tables and their privacy rules are in `supabase/migrations/`. People can only change their own data; signed-out visitors see nothing.
+
+## Publishing
+
+Every push to `main` builds the app and publishes it to GitHub Pages (`.github/workflows/pages.yml`). The Supabase publishable key comes from the repository's encrypted Actions secret `SUPABASE_PUBLISHABLE_KEY`; it is never stored in the code.
+
 ## Where it runs right now
 
 The app is one file, `app/unbroken.html`. It is published as a private Claude page for testing:
@@ -29,7 +41,7 @@ git config core.hooksPath .githooks
 
 ## Plan to become a real app
 
-1. **Accounts and database (next).** Move sign-in and saving to Supabase: email and password with strong password rules (8+ characters, upper and lower case, a number and a symbol), log in and out, password reset, and a limit on sign-ups enforced by the server.
+1. **Accounts and database (done).** Sign up, log in and log out on Supabase. Still to come: password reset (needs an email service) and deleting your account.
 2. **Server-side safety.** Run the photo check and the word filter on the server too, so nobody can get around them.
 3. **Phone apps.** Wrap the same screens for iPhone and Android with Capacitor. This also fixes photo uploads, which the Claude Android app blocks inside pages.
 4. **Push notifications** for the daily reminder.
