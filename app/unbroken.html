@@ -532,11 +532,13 @@ function takePhoto(file){
 const BAD=(()=>{try{return JSON.parse(atob('eyJzIjogWyJmdWNrIiwgImZ1ayIsICJzaGl0IiwgImN1bnQiLCAiYml0Y2giLCAibmlnZ2VyIiwgIm5pZ2dhIiwgImZhZ2dvdCIsICJ3aG9yZSIsICJiYXN0YXJkIiwgImFzc2hvbGUiLCAiYXNob2xlIiwgIm1vdGhlcmYiLCAicmV0YXJkIiwgImtpa2UiLCAiZGlja2hlYWQiLCAiY29ja3N1Y2siLCAiamFja2FzcyIsICJkdW1iYXNzIiwgImJ1bGxzaGl0Il0sICJ3IjogWyJhc3MiLCAiYXJzZSIsICJkaWNrIiwgImNvY2siLCAicHVzc3kiLCAic2x1dCIsICJmYWciLCAidHdhdCIsICJ3YW5rIiwgIndhbmtlciIsICJjdW0iLCAidGl0cyIsICJwb3JuIiwgInJhcGUiLCAiZHlrZSIsICJjaGluayIsICJzcGljIiwgImdvb2siLCAiaml6eiIsICJwcmljayIsICJib2xsb2NrcyIsICJwaXNzIiwgImZjayIsICJmayIsICJzdGZ1IiwgInd0ZiIsICJtaWxmIiwgIm5hemkiLCAiaG9lIiwgInRob3QiXX0='));}catch(e){return {s:[],w:[]};}})();
 const LEET={'0':'o','1':'i','3':'e','4':'a','5':'s','7':'t','@':'a','$':'s','!':'i','|':'l'};
 const squash=w=>w.replace(/(.)\1+/g,'$1');
+const ALLOW=['shitake','shiitake','shitakes','shiitakes'];
 function hasBad(t){
   for(const raw of String(t||'').toLowerCase().split(/\s+/)){
     const w=raw.replace(/[013457@$!|]/g,c=>LEET[c]).replace(/[^a-z]/g,'');if(!w)continue;
-    const q=squash(w);
-    if(BAD.s.some(b=>w.includes(b)||q.includes(squash(b))))return true;
+    const q=squash(w),edge=(x,b)=>x.startsWith(b)||x.endsWith(b);
+    if(ALLOW.includes(w)||ALLOW.includes(q))continue;
+    if(BAD.s.some(b=>edge(w,b)||edge(q,squash(b))))return true;
     if(BAD.w.includes(w)||BAD.w.includes(q))return true;
   }
   return false;
@@ -621,7 +623,7 @@ function evaluate(h,t=today()){
     const N=h.sched.every,days=h.sched.days;let anchor=s-1;
     const req=d=>type==='daily'?true:type==='weekdays'?days.includes(dow(d)):d-anchor>=N;
     for(let d=s;d<=t;d++){const k=keyOf(d),n=log[k]||0;
-      if(n>=goal){cur++;total++;hit++;best=Math.max(best,cur);anchor=d;st.set(d,'done');continue;}
+      if(n>=goal){cur++;total++;if(type!=='weekdays'||days.includes(dow(d)))hit++;best=Math.max(best,cur);anchor=d;st.set(d,'done');continue;}
       if(skip[k]){st.set(d,'skip');if(type==='interval')anchor++;continue;}
       if(!req(d)){st.set(d,n>0?'partial':'off');continue;}
       if(d===t){st.set(d,n>0?'partial':'due');r.dueToday=true;continue;}

@@ -157,11 +157,15 @@ test('word filter: masks only the rude word', () => {
   assert.equal(M.maskBad('nice shit day'), 'nice •••• day');
 });
 
-// Known issues found in Phase 0. Each is a "todo" test: it runs and reports, but does not fail the suite until it is fixed.
-test('known issue: the word filter blocks some innocent names that contain a rude word', { todo: 'Scunthorpe, Matsushita and "shitake" are blocked' }, () => {
+// Fixed in Phase 1 (found in Phase 0).
+test('word filter: innocent names that contain a rude word are allowed (was a known issue)', () => {
   for (const w of ['Scunthorpe', 'Matsushita', 'shitake mushrooms']) assert.equal(M.hasBad(w), false, w);
 });
-test('known issue: extra days done on "certain weekdays" streaks raise the hit rate', { todo: 'hit rate should count scheduled days only' }, () => {
+test('hit rate on "certain weekdays" counts scheduled days only (was a known issue)', () => {
   const e = ev(habit({ sched: { type: 'weekdays', days: [1] }, start: '2026-11-02', log: { '2026-11-02': 1, '2026-11-03': 1 } }));
   assert.equal(Math.round(e.rate * 100), 33);
+});
+
+test('word filter: still catches rude words at the start or end of a longer word', () => {
+  for (const w of ['bullshit', 'dipshit', 'horseshit', 'fuckface', 'shithead', 'ohfuck', 'motherfucker', 'shiiiit']) assert.equal(M.hasBad(w), true, w);
 });
