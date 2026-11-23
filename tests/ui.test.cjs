@@ -20,7 +20,7 @@ test('first run: an empty account shows "No streaks yet" and no example or start
 test('new streak: preset picture, title and schedule save, and the tile appears', async () => {
   const { page, errors } = await open({ empty: true });
   await page.tap('.empty-card [data-act="new"]');
-  assert.equal(await page.$$eval('#sheetBody .form > .field', f => f.length), 3, 'only Picture, Title and How often before More options');
+  assert.equal(await page.$$eval('#sheetBody .form > .field', f => f.length), 4, 'only Picture, Title, Type and How often before More options');
   await page.tap('.preset[data-i="1"]');
   await page.fill('#f-name', 'Drink water');
   await page.tap('[data-act="stype"][data-v="weekdays"]');
@@ -483,4 +483,110 @@ test('drag to reorder: after a drag, the very next tap works normally', async ()
   await closeSheet(page);
   await page.tap('.tile[data-id="h3"]'); await page.waitForTimeout(500);
   assert.equal(await page.isVisible('#sheet .detail'), true);
+});
+
+/* ---------- Phase 2 ---------- */
+const newOfType = async (page, { name, kind, unit, goal, step, period }) => {
+  await page.tap(await page.$('.empty-card [data-act="new"]') ? '.empty-card [data-act="new"]' : '#fab');
+  await page.tap('.preset[data-i="0"]'); await page.fill('#f-name', name);
+  await page.tap(`[data-act="ktype"][data-v="${kind}"]`);
+  if (unit !== undefined) await page.fill('#f-unit', unit);
+  if (goal !== undefined) await page.fill('#f-goal', String(goal));
+  if (period) await page.tap(`[data-act="gper"][data-v="${period}"]`);
+  if (step !== undefined) await page.fill('#f-step', String(step));
+  await page.tap('[data-act="save"]'); await settle(page);
+  return page.evaluate(n => Object.values(Object.fromEntries(window.__store)).find(d => d.name === n), name);
+};
+const tileOf = (page, name) => page.$eval(`.tile:has(.nm:text-is("${name}"))`, t => ({ big: t.querySelector('.tile-streak b').textContent, small: t.querySelector('.tile-streak small').textContent, meta: t.querySelector('.meta').textContent, id: t.dataset.id }));
+
+test('counter: no schedule, each double-tap adds to the total, and it is never "already done"', async () => {
+  const { page, today, errors } = await open({ empty: true });
+  await page.tap('.empty-card [data-act="new"]'); await page.tap('[data-act="ktype"][data-v="counter"]');
+  assert.equal(await page.$$eval('[data-act="stype"]', x => x.length), 0, 'no schedule for counters');
+  await page.tap('.sh-head [data-act="close"]'); await page.waitForTimeout(300);
+  const saved = await newOfType(page, { name: 'Books read', kind: 'counter', unit: 'books' });
+  assert.equal(saved.kind, 'counter'); assert.equal(saved.unit, 'books');
+  const id = (await tileOf(page, 'Books read')).id;
+  for (let i = 0; i < 3; i++) { await page.dblclick(`.tile[data-id="${id}"]`); await page.waitForTimeout(400); }
+  await settle(page);
+  assert.deepEqual(await tileOf(page, 'Books read').then(x => [x.big, x.small, x.meta]), ['3', 'books', '+3 today']);
+  assert.equal((await doc(page, id)).log[today], 3);
+  assert.match(await page.textContent('#summary'), /Nothing due today/, 'counters are never "due"');
+  noErrors(errors);
+});
+
+test('goal (daily): a target with +5 increments; the day completes at the target', async () => {
+  const { page, today } = await open({ empty: true });
+  const saved = await newOfType(page, { name: 'Read', kind: 'goal', unit: 'pages', goal: 20, step: 5 });
+  assert.deepEqual([saved.kind, saved.goal, saved.step, saved.period], ['goal', 20, 5, 'day']);
+  const id = saved.id;
+  await page.dblclick(`.tile[data-id="${id}"]`); await page.waitForTimeout(150);
+  assert.deepEqual(await page.$$eval('.burst', x => x.map(b => b.textContent)), ['+5']);
+  for (let i = 0; i < 3; i++) { await page.dblclick(`.tile[data-id="${id}"]`); await page.waitForTimeout(400); }
+  await settle(page);
+  assert.equal((await doc(page, id)).log[today], 20);
+  assert.deepEqual(await tileOf(page, 'Read').then(x => [x.big, x.small]), ['20', '/ 20 pages']);
+  assert.equal(await page.$$eval(`.tile[data-id="${id}"] .badge.on`, x => x.length), 1);
+  assert.match(await page.textContent('#summary'), /All done today/);
+});
+
+test('goal (weekly): amounts add up across the week', async () => {
+  const { page, today } = await open({ empty: true });
+  const saved = await newOfType(page, { name: 'Push-ups', kind: 'goal', unit: 'push-ups', goal: 100, step: 25, period: 'week' });
+  for (let i = 0; i < 2; i++) { await page.dblclick(`.tile[data-id="${saved.id}"]`); await page.waitForTimeout(400); }
+  await settle(page);
+  assert.deepEqual(await tileOf(page, 'Push-ups').then(x => [x.big, x.small]), ['50', '/ 100 push-ups']);
+  await page.tap(`.tile[data-id="${saved.id}"]`); await page.waitForTimeout(500);
+  assert.match(await page.textContent('.line'), /50 push-ups to go this week/);
+});
+
+test('counter: a past day can be corrected from its calendar', async () => {
+  const { page, key } = await open({ empty: true });
+  const saved = await newOfType(page, { name: 'Games won', kind: 'counter', unit: 'games' });
+  await page.tap(`.tile[data-id="${saved.id}"]`); await page.waitForTimeout(500);
+  const d = await page.evaluate(k => { const [y, m, dd] = k.split('-').map(Number); return Math.round(Date.UTC(y, m - 1, dd) / 864e5); }, key(3));
+  if (!(await page.$(`button.cd[data-d="${d}"]`))) { await page.tap('[data-act="mprev"]'); await page.waitForTimeout(200); }
+  await page.tap(`button.cd[data-d="${d}"]`); await page.waitForTimeout(200);
+  assert.equal(await page.isVisible('[data-act="dsel"].link'), true, '"Back to today" appears');
+  await page.tap('[data-act="inc"]'); await settle(page); await page.tap('[data-act="inc"]'); await settle(page);
+  assert.equal((await doc(page, saved.id)).log[key(3)], 2);
+  assert.equal(await page.textContent('.bignum'), '2');
+  await page.tap('[data-act="dec"]'); await settle(page);
+  assert.equal((await doc(page, saved.id)).log[key(3)], 1);
+  await page.tap('#undoBtn'); await settle(page);
+  assert.equal((await doc(page, saved.id)).log[key(3)], 2, 'corrections can be undone too');
+});
+
+test('milestones: the streak page shows earned milestones with dates and how far the next one is', async () => {
+  const { page, key } = await open();
+  await openStreak(page, 'h1');
+  const m = await page.$$eval('.mile', x => x.map(li => [li.className.replace('mile', '').trim(), li.querySelector('b').textContent, li.querySelector('small').textContent]));
+  assert.deepEqual(m[0].slice(0, 2), ['on', '7']); assert.deepEqual(m[1], ['next', '30', '19 to go']); assert.deepEqual(m.slice(2).map(x => x[1]), ['100', '365']);
+});
+
+test('milestones: reaching one shows a quiet message, not a pop-up', async () => {
+  const s = makeSeed(); const k = s.key;
+  s.seed['data/users/u_me/h1'].log = Object.fromEntries([6, 5, 4, 3, 2, 1].map(n => [k(n), 1]));
+  const { page } = await openClaude({ init: mockClaude, initArg: { seed: s.seed } });
+  await page.dblclick('.tile[data-id="h1"]'); await settle(page);
+  assert.equal(await page.textContent('#toast span'), 'Milestone: 7 days in a row · Read 20 pages');
+  assert.equal(await page.$eval('#toast', t => t.classList.contains('big')), false);
+});
+
+test('changing an existing streak into a counter keeps its history', async () => {
+  const { page } = await open();
+  await openStreak(page, 'h1'); await page.tap('[data-act="edit"]'); await page.tap('[data-act="ktype"][data-v="counter"]'); await page.fill('#f-unit', 'sessions');
+  await page.tap('[data-act="save"]'); await settle(page);
+  const d = await doc(page, 'h1');
+  assert.equal(d.kind, 'counter'); assert.equal(Object.keys(d.log).length, 11);
+  assert.equal(await page.textContent('.bignum'), '11');
+});
+
+test("friends: a friend's counter shows its total", async () => {
+  const s = makeSeed();
+  s.seed['people/u_ana/streaks/ha2'] = { id: 'ha2', kind: 'counter', unit: 'books', name: 'Books', icon: '📚', color: '#5f8f3e', sched: { type: 'daily' }, goal: 1, start: '2026-01-01', log: { '2026-01-02': 3, '2026-02-01': 4 }, skip: {}, order: 2 };
+  const { page } = await openClaude({ init: mockClaude, initArg: { seed: s.seed } });
+  await page.tap('#tabFriends'); await page.waitForTimeout(400);
+  await page.tap('[data-act="follow"][data-id="u_ana"]'); await page.waitForSelector('.mini');
+  assert.deepEqual(await page.$$eval('.mini', m => m.map(x => x.getAttribute('aria-label'))), ['Morning swim: 16 days, done today', 'Books: 7 books']);
 });

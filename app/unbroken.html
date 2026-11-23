@@ -151,6 +151,18 @@ div.card{cursor:default}
 .card.lifted{background:var(--surface)}
 .tile.lifted{background:var(--bg);outline:var(--s2) solid var(--bg)}
 body.dragging{-webkit-user-select:none;user-select:none;cursor:grabbing}
+.bar{display:block;height:4px;margin:2px 0;border-radius:2px;background:var(--surface-2);overflow:hidden}
+.bar i{display:block;height:100%;background:var(--hc);border-radius:2px;transition:width var(--base) var(--ease)}
+.detail>.bar{height:6px;margin-top:calc(-1 * var(--s3))}
+.cd.sel{box-shadow:0 0 0 2px var(--surface),0 0 0 3.5px var(--accent)}
+.miles{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(68px,1fr));gap:var(--s2)}
+.mile{display:flex;flex-direction:column;gap:2px;padding:var(--s2) var(--s3);border:1px solid var(--line);border-radius:var(--r-md);min-width:0}
+.mile b{font:600 17px/1.1 var(--f-display);color:var(--ink-3);font-variant-numeric:tabular-nums}
+.mile small{font:var(--t-xs);color:var(--ink-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mile.on{border-color:color-mix(in srgb,var(--hc) 55%,var(--line))}
+.mile.on b{color:var(--ink)}.mile.on small{color:var(--ink-2)}
+.mile.next{border-style:dashed}.mile.next b{color:var(--ink-2)}
+.mile.new{animation:checkin .4s var(--ease)}
 .hidden-note{font:var(--t-sm);color:var(--ink-2);text-align:center;margin-top:var(--s3)}
 .link{background:none;border:none;padding:var(--s1);font:var(--t-sm);font-weight:600;color:var(--accent);cursor:pointer;text-decoration:underline;text-underline-offset:3px}
 
@@ -665,6 +677,8 @@ function chainLinks(states){
 
 /* ---------- Text ---------- */
 function schedText(h){
+  if(h.kind==='counter')return 'Running count';
+  if(h.kind==='goal')return `${amt(h,h.goal)} a ${h.period==='week'?'week':'day'}`;
   const s=h.sched,ws=S.settings.weekStart;
   switch(s.type){
     case 'weekdays':{const j=s.days.join();if(s.days.length===7)return 'Every day';if(j==='1,2,3,4,5')return 'Weekdays';if(j==='0,6')return 'Weekends';
@@ -718,20 +732,29 @@ function stripHTML(h,e,t,sm){
   return `<span class="strip${sm?' sm':''}" aria-hidden="true">${states.map((x,i)=>{const d=ws+i;return `<span class="d s-${x}${links[i]?' jl':''}${d===t?' now':''}"><i></i><em>${DL[dow(d)]}</em></span>`;}).join('')}</span>`;
 }
 const hcStyle=h=>`--hc:${h.color};--hc-on:${onColor(h.color)}`;
-function tapLabel(h,e,meta){return `${nameOf(h)}: ${e.cur} ${uw(e.unit,e.cur)} streak, ${meta}. Double-tap to add one. Tap to open.`;}
+function showNum(h,e){
+  if(e.kind==='counter')return [e.sum,countLabel(h,e,e.sum)];
+  if(e.kind==='goal'){const p=e.period?e.period.count:e.today;return [p,`/ ${amt(h,h.goal)}`];}
+  return [e.cur,uw(e.unit,e.cur)];
+}
+const goalPct=(h,e)=>Math.min(1,(e.period?e.period.count:e.today)/h.goal);
+const barHTML=(h,e)=>e.kind==='goal'?`<span class="bar" aria-hidden="true"><i style="width:${Math.round(goalPct(h,e)*100)}%"></i></span>`:'';
+function tapLabel(h,e,meta){const [b,sm]=showNum(h,e);return `${nameOf(h)}: ${b} ${sm}${e.kind==='streak'?' streak':''}, ${meta}. Double-tap to add ${stepOf(h)}. Tap to open.`;}
 function tileHTML(h,e,t){
-  const k=keyOf(t),n=h.log[k]||0,done=n>=h.goal,rest=!!h.skip[k],meta=statusText(h,e,t);
-  const badge=done?`<span class="badge on">${I.check}${n>1?`×${n}`:''}</span>`:h.goal>1&&n?`<span class="badge">${n}/${h.goal}</span>`:'';
+  const k=keyOf(t),n=h.log[k]||0,done=e.doneToday,meta=e.kind==='goal'&&e.cur?`${e.cur} ${uw(e.unit,e.cur)} in a row`:statusText(h,e,t),[big,small]=showNum(h,e);
+  const badge=e.kind==='counter'?(n?`<span class="badge">+${n}</span>`:''):done?`<span class="badge on">${I.check}${e.kind==='streak'&&n>1?`×${n}`:''}</span>`:e.kind==='streak'&&h.goal>1&&n?`<span class="badge">${n}/${h.goal}</span>`:'';
   return `<button class="tile${done?' is-done':''}" data-act="card" data-id="${h.id}" data-card="${h.id}" style="${hcStyle(h)}" aria-label="${esc(tapLabel(h,e,meta))}">
     <span class="media">${vis(h)}${badge}</span>
-    <span class="tile-body"><span class="nm">${esc(nameOf(h))}</span><span class="tile-count"><span class="tile-streak"><b>${e.cur}</b><small>${uw(e.unit,e.cur)}</small></span><span class="meta">${esc(meta)}</span></span>${stripHTML(h,e,t,true)}</span></button>`;
+    <span class="tile-body"><span class="nm">${esc(nameOf(h))}</span><span class="tile-count"><span class="tile-streak"><b>${big}</b><small>${esc(small)}</small></span>${barHTML(h,e)}<span class="meta">${esc(meta)}</span></span>${stripHTML(h,e,t,true)}</span></button>`;
 }
 function cardHTML(h,e,t,demo){
-  const k=keyOf(t),n=h.log[k]||0,done=n>=h.goal,rest=!!h.skip[k],multi=h.goal>1,nm=nameOf(h);
+  const k=keyOf(t),n=h.log[k]||0,done=e.doneToday,rest=!!h.skip[k],multi=h.goal>1,nm=nameOf(h);
   const off=!e.dueToday&&!done&&!rest&&!e.period,meta=schedText(h)+' · '+statusText(h,e,t),static_=demo||ui.reorder;
   const strip=S.settings.layout==='compact'?'':stripHTML(h,e,t);
   const right=ui.reorder&&!demo
     ?`<div class="mv"><button class="icon-btn sm" data-act="up" data-id="${h.id}" aria-label="Move ${esc(nm)} up">${I.up}</button><button class="icon-btn sm" data-act="down" data-id="${h.id}" aria-label="Move ${esc(nm)} down">${I.down}</button></div>`
+    :e.kind==='counter'?`<span class="streak"><b>${e.sum}</b><small>${esc(countLabel(h,e,e.sum))}</small></span><span class="today${n?'':' off'}" aria-hidden="true">${n?`<span>+${n}</span>`:I.plus}</span>`
+    :e.kind==='goal'?`<span class="streak${e.cur>0&&!e.doneToday&&e.dueToday?' pending':''}"><b>${e.cur}</b><small>${uw(e.unit,e.cur)}</small></span><span class="today multi${e.doneToday?' on':''}" style="--p:${goalPct(h,e)}" aria-hidden="true">${e.doneToday?I.check:`<span>${Math.round(goalPct(h,e)*100)}<small>%</small></span>`}</span>`
     :`<span class="streak${e.cur>0&&!done&&e.dueToday?' pending':''}"><b>${e.cur}</b><small>${uw(e.unit,e.cur)}</small></span><span class="today${done?' on':''}${multi?' multi':''}${rest&&!done?' rest':''}${off?' off':''}" style="--p:${Math.min(1,n/h.goal)}" aria-hidden="true">${multi?`<span>${n}<small>/${h.goal}</small></span>`:rest&&!done?I.moon:n>1?`<span>×${n}</span>`:I.check}</span>`;
   const tag=static_?'div':'button';
   return `<${tag} class="card${done?' is-done':''}" data-card="${h.id}" style="${hcStyle(h)}"${static_?'':` data-act="card" data-id="${h.id}" aria-label="${esc(tapLabel(h,e,meta))}"`}><span class="thumb">${vis(h)}</span><span class="txt"><span class="nm">${esc(nm)}</span><span class="meta">${esc(meta)}</span>${strip}</span>${right}</${tag}>`;
@@ -792,7 +815,7 @@ function renderMine(t){
 /* ---------- Friends ---------- */
 function miniHTML(pid,h,t){
   const e=evaluate(h,t);
-  return `<button class="mini" data-act="fopen" data-pid="${pid}" data-id="${h.id}" style="${hcStyle(h)}" aria-label="${esc(`${nameOf(h)}: ${e.cur} ${uw(e.unit,e.cur)}${e.doneToday?', done today':''}`)}"><span class="media">${vis(h)}<span class="tile-streak"><b>${e.cur}</b><small>${uw(e.unit,e.cur)}</small></span>${e.doneToday?`<span class="badge on">${I.check}</span>`:''}</span><span class="mini-t">${esc(nameOf(h))}</span></button>`;
+  return `<button class="mini" data-act="fopen" data-pid="${pid}" data-id="${h.id}" style="${hcStyle(h)}" aria-label="${esc(`${nameOf(h)}: ${showNum(h,e).join(' ')}${e.doneToday?', done today':''}`)}"><span class="media">${vis(h)}<span class="tile-streak"><b>${showNum(h,e)[0]}</b><small>${esc(showNum(h,e)[1])}</small></span>${e.doneToday?`<span class="badge on">${I.check}</span>`:''}</span><span class="mini-t">${esc(nameOf(h))}</span></button>`;
 }
 const pubList=m=>Object.values(m||{}).sort((a,b)=>a.order-b.order);
 function followHTML(id,t){
@@ -872,18 +895,24 @@ function fx(id,plus,done){plus=plus===true?1:plus;
 
 /* ---------- Sheets ---------- */
 function detailHTML(h,ro,pid){
-  const t=today(),e=evaluate(h,t),k=keyOf(t),n=h.log[k]||0,done=n>=h.goal,rest=!!h.skip[k],nm=nameOf(h),u=h.unit||'times';
+  const t=today(),e=evaluate(h,t),k=keyOf(t),n=h.log[k]||0,done=e.doneToday,rest=!!h.skip[k],nm=nameOf(h),u=h.unit||'times';
+  const sel=e.kind!=='streak'&&ui.sheet.sel!=null&&ui.sheet.sel<=t?ui.sheet.sel:t,sn=h.log[keyOf(sel)]||0,when=sel===t?'today':fmt(sel);
   let line;
   if(ro) line=statusText(h,e,t)+'.';
+  else if(e.kind==='counter') line=n?`+${n} today. ${e.week} this week.`:`Nothing yet today. ${e.week} this week.`;
+  else if(e.kind==='goal'){const p=e.period?e.period.count:e.today,left=h.goal-p,per=e.period?'this week':'today';line=left<=0?`Goal reached ${per}. The streak is safe.`:`${amt(h,left)} to go ${per}${e.cur?` to make it ${e.cur+1} ${uw(e.unit,e.cur+1)} in a row`:''}.`;}
   else if(e.period){const p=e.period,left=p.target-p.count;line=!p.target?`Rest ${e.unit}. The streak waits for you.`:left<=0?`Done for this ${e.unit}. The streak is safe.`:`${left} more this ${e.unit} to make it ${e.cur+1}.`;}
   else if(done) line=n>1?`Done today, ${n} times.`:'Done for today.';
   else if(rest) line='Rest day. The streak is paused, not broken.';
   else if(e.dueToday) line=e.cur?`Check in today to make it ${e.cur+1}.`:'Check in today to start a streak.';
   else if(h.sched.type==='weekdays')line=e.next!=null?`Not scheduled today. Next: ${relDay(e.next,t)}.`:'Not scheduled today.';
   else line=e.next!=null?`Not due today. Next: ${relDay(e.next,t)}.`:'Not due today.';
-  const stats=[['Best',`${e.best} ${uw(e.unit,e.best)}`],['Hit rate',e.rate==null?'–':Math.round(e.rate*100)+'%'],['Days done',String(e.total)]];
-  if(h.freezes) stats.push(['Free misses left',`${e.freezesLeft} of ${h.freezes}`]);
-  else stats.push([`Total ${h.goal>1?u:'count'}`,String(Object.values(h.log).reduce((a,b)=>a+b,0))]);
+  let stats;
+  if(e.kind==='counter') stats=[['Total',String(e.sum)],['This week',String(e.week)],['This month',String(e.month)],['Best day',String(e.best)]];
+  else{stats=[['Best',`${e.best} ${uw(e.unit,e.best)}`],['Hit rate',e.rate==null?'–':Math.round(e.rate*100)+'%'],[e.kind==='goal'?'Days logged':'Days done',String(e.total)]];
+    if(h.freezes) stats.push(['Free misses left',`${e.freezesLeft} of ${h.freezes}`]);
+    else stats.push([`Total ${h.goal>1?u:'count'}`,String(e.sum)]);}
+  const [bn,bs]=showNum(h,e);
   const head=ro
     ?`<div class="sh-head"><button class="icon-btn" data-act="back" aria-label="Back to ${esc(displayName(pid))}">${I.left}</button><div class="dh-t"><h2>${esc(nm)}</h2><p>${esc(displayName(pid))} · ${esc(schedText(h)+goalText(h))}</p></div><button class="icon-btn" data-act="close" aria-label="Close">${I.x}</button></div>`
     :`<div class="sh-head" style="--hc:${h.color}"><div class="dh"><span class="ico-sm">${h.photo?`<img src="${esc(h.photo)}" alt="">`:esc(h.icon)}</span><div class="dh-t"><h2>${esc(nm)}</h2><p>${esc(schedText(h)+goalText(h))}</p></div></div><button class="icon-btn" data-act="close" aria-label="Close">${I.x}</button></div>`;
@@ -891,9 +920,11 @@ function detailHTML(h,ro,pid){
   if(!ro&&social.db&&social.profiles[social.uid]){const me=social.profiles[social.uid];visLine=`<p class="hint">${h.hidden?"Private. Friends can't see this streak.":me.private?"Your profile is private, so friends can't see this streak.":'Friends who add you can see this streak.'}</p>`;}
   return `${head}<div class="detail" style="${hcStyle(h)}">
     ${h.photo?`<div class="banner"><img src="${esc(h.photo)}" alt=""></div>`:''}
-    <div class="big"><span class="bignum${!done&&e.dueToday&&e.cur?' pending':''}">${e.cur}</span><span class="bigl">${uw(e.unit,e.cur)} in a row</span></div>
+    <div class="big"><span class="bignum${e.kind==='streak'&&!done&&e.dueToday&&e.cur?' pending':''}">${bn}</span><span class="bigl">${esc(e.kind==='counter'?`${bs} in all`:e.kind==='goal'?`${bs} ${e.period?'this week':'today'}`:`${bs} in a row`)}</span></div>
+    ${barHTML(h,e)}
     <p class="line">${esc(line)}</p>
-    ${ro?'':`<div class="todayctl"><span class="stepper big"><button data-act="dec" data-id="${h.id}" aria-label="One less today" ${n?'':'disabled'}>${I.minus}</button><output aria-live="polite">${n}<small> ${h.goal>1?`/ ${h.goal} ${esc(u)}`:'today'}</small></output><button data-act="inc" data-id="${h.id}" aria-label="One more today">${I.plus}</button></span><button class="btn" data-act="rest" data-id="${h.id}" aria-pressed="${rest}">${rest?'Resting today':'Rest day'}</button></div>`}
+    ${ro?'':`<div class="todayctl"><span class="stepper big"><button data-act="dec" data-id="${h.id}" aria-label="Take away ${stepOf(h)}, ${when}" ${(e.kind==='streak'?n:sn)?'':'disabled'}>${I.minus}</button><output aria-live="polite">${e.kind==='streak'?n:sn}<small> ${e.kind==='streak'&&h.goal===1?'today':`${h.goal>1&&e.kind!=='counter'&&!e.period?`/ ${h.goal} `:''}${esc(e.kind==='streak'?u:when)}`}</small></output><button data-act="inc" data-id="${h.id}" aria-label="Add ${stepOf(h)}, ${when}">${I.plus}</button></span>${e.kind==='counter'?'':`<button class="btn" data-act="rest" data-id="${h.id}" aria-pressed="${rest}">${rest?'Resting today':'Rest day'}</button>`}${sel!==t?`<button type="button" class="link" data-act="dsel" data-d="${t}">Back to today</button>`:''}</div>`}
+    ${milestonesHTML(h,e,t)}
     <div class="stats">${stats.map(([a,b])=>`<div><span>${esc(a)}</span><b>${esc(b)}</b></div>`).join('')}</div>
     ${calHTML(h,e,ui.sheet.month,t,ro)}
     ${!ro&&h.note?`<blockquote class="note">${esc(h.note)}</blockquote>`:''}
@@ -901,6 +932,12 @@ function detailHTML(h,ro,pid){
     ${ro?'':ui.sheet.confirmDel?`<div class="danger" role="alert"><p>Delete ${esc(nm)} and its ${Object.keys(h.log).length} ${Object.keys(h.log).length===1?'check-in':'check-ins'}?${social.profiles[social.uid]&&!h.hidden?' Friends will stop seeing it too.':''}</p><div class="row"><button class="btn danger" data-act="ddelyes" data-id="${h.id}">Delete streak</button><button class="btn ghost" data-act="ddelno">Keep it</button></div></div>`
       :`<div class="actions"><button class="btn" data-act="edit" data-id="${h.id}">Edit streak</button><button class="btn ghost" data-act="archive" data-id="${h.id}">Archive</button><button class="btn ghost danger-text" data-act="ddel">Delete</button></div>`}
   </div>`;
+}
+function milestonesHTML(h,e,t){
+  const list=e.mileList||[],now=e.kind==='counter'?e.sum:e.cur,next=list.find(m=>!(m in e.miles));
+  if(!list.length)return '';
+  return `<div class="field"><span class="lab">Milestones</span><ul class="miles">${list.map(m=>{const d=e.miles[m];
+    return d!=null?`<li class="mile on${d===t?' new':''}"><b>${m}</b><small>${esc(fmt(d))}</small></li>`:m===next?`<li class="mile next"><b>${m}</b><small>${m-now} to go</small></li>`:`<li class="mile"><b>${m}</b><small>${esc(countLabel(h,e,m))}</small></li>`;}).join('')}</ul></div>`;
 }
 function calHTML(h,e,m,t,ro){
   const ws=S.settings.weekStart,me=monthEndOf(m),lead=(dow(m)-ws+7)%7,s=dnOf(h.start),cells=[];
@@ -914,16 +951,17 @@ function calHTML(h,e,m,t,ro){
       if(d==null)return '<span class="cd blank"></span>';
       const n=h.log[keyOf(d)]||0,st=sts[i],part=n>0&&n<h.goal;if(st==='done')dc++;
       const lbl=`${fmt(d)}: ${part?`${n} of ${h.goal}`:words[st]||''}`,cls=`cd s-${st}${ln[i]?' jl':''}${d===t?' now':''}${part?' part':''}`,sty=part?` style="--p:${n/h.goal}"`:'';
+      const pick=e.kind!=='streak',on=pick&&d===(ui.sheet.sel!=null?ui.sheet.sel:t)?' sel':'';
       return ro?`<span class="${cls}"${sty} role="img" aria-label="${esc(lbl)}">${new Date(d*DAY).getUTCDate()}</span>`
-        :`<button class="${cls}"${sty} data-act="day" data-d="${d}"${d>t?' disabled':''} aria-label="${esc(lbl)}">${new Date(d*DAY).getUTCDate()}</button>`;
+        :`<button class="${cls}${on}"${sty} data-act="${pick?'dsel':'day'}" data-d="${d}"${d>t?' disabled':''} aria-label="${esc(pick?`${fmt(d)}: ${n?amt(h,n):'nothing logged'}`:lbl)}"${pick?` aria-pressed="${!!on}"`:''}>${new Date(d*DAY).getUTCDate()}</button>`;
     }).join('');
   }
   const x=new Date(m*DAY);
   return `<div class="cal"><div class="cal-head"><button class="icon-btn sm" data-act="mprev" aria-label="Previous month">${I.left}</button><h3>${MONL[x.getUTCMonth()]} ${x.getUTCFullYear()}<small>${dc} done</small></h3><button class="icon-btn sm" data-act="mnext" aria-label="Next month"${m>=monthStartOf(t)?' disabled':''}>${I.right}</button></div>
     <div class="cal-dow" aria-hidden="true">${[0,1,2,3,4,5,6].map(i=>`<span>${DL[(ws+i)%7]}</span>`).join('')}</div>
     <div class="cal-grid">${html}</div>
-    <div class="legend"><span><i class="lg s-done"></i>Done</span><span><i class="lg s-skip"></i>Rest day</span>${h.freezes?'<span><i class="lg s-frozen"></i>Free miss</span>':''}<span><i class="lg s-missed"></i>Missed</span></div>
-    ${ro?'':'<p class="hint">Tap a day to mark it done. Tap again for a rest day, and once more to clear it. Rest days never break a streak.</p>'}</div>`;
+    <div class="legend">${e.kind==='counter'?'<span><i class="lg s-done"></i>Logged</span>':`<span><i class="lg s-done"></i>${e.kind==='goal'?'Reached':'Done'}</span><span><i class="lg s-skip"></i>Rest day</span>${h.freezes?'<span><i class="lg s-frozen"></i>Free miss</span>':''}<span><i class="lg s-missed"></i>Missed</span>`}</div>
+    ${ro?'':e.kind==='streak'?'<p class="hint">Tap a day to mark it done. Tap again for a rest day, and once more to clear it. Rest days never break a streak.</p>':'<p class="hint">Tap a day to see or correct its count with − and +.</p>'}</div>`;
 }
 const stepper=(f,v,min,max)=>`<span class="stepper"><button type="button" data-act="step" data-f="${f}" data-d="-1" data-min="${min}" data-max="${max}" aria-label="Fewer"${v<=min?' disabled':''}>${I.minus}</button><output aria-live="polite">${v}</output><button type="button" data-act="step" data-f="${f}" data-d="1" data-min="${min}" data-max="${max}" aria-label="More"${v>=max?' disabled':''}>${I.plus}</button></span>`;
 function editorHTML(){
@@ -938,15 +976,16 @@ function editorHTML(){
   const unit=sc.type==='perWeek'?'week':sc.type==='perMonth'?'month':'day',logs=Object.keys(E.log).length;
   const canShare=!!(social.db&&!social.blocked&&social.can!==false);
   const main=[['daily','Every day'],['weekdays','Certain days'],['perWeek','Times a week']],other=[['interval','Every few days'],['perMonth','Times a month']];
+  const stepField=`<div class="field"><label class="lab" for="f-step">Each double-tap adds</label><div class="row"><input type="number" id="f-step" inputmode="numeric" min="1" max="1000" value="${E.step}" style="width:104px"><span class="hint">${esc(E.unit||'')}</span></div></div>`;
   const segBtn=([v,l])=>`<button type="button" data-act="stype" data-v="${v}" aria-pressed="${sc.type===v}">${l}</button>`;
   const more=sh.more?`<div class="form more">
-    <div class="field"><span class="lab">Other schedules</span><div class="seg">${other.map(segBtn).join('')}</div></div>
-    <div class="field"><span class="lab">A day counts after</span><div class="row">${stepper('goal',E.goal,1,99)} ${E.goal===1?'double-tap':'double-taps'}</div>
-      ${E.goal>1?`<input id="f-unit" value="${esc(E.unit)}" maxlength="16" placeholder="What you count, like glasses or pages" autocomplete="off" aria-label="What you count">`:''}</div>
-    <div class="field"><span class="lab">Reminder</span><div class="seg">${[['default',S.settings.remind?`Default (${fmtTime(S.settings.remindAt)})`:'Default (off)'],['custom','Own time'],['off','Off']].map(([v,l])=>`<button type="button" data-act="rmode" data-v="${v}" aria-pressed="${E.remindMode===v}">${l}</button>`).join('')}</div>
+    ${E.kind==='streak'?`<div class="field"><span class="lab">Other schedules</span><div class="seg">${other.map(segBtn).join('')}</div></div>
+    <div class="field"><span class="lab">A day counts after</span><div class="row">${stepper('goal',Math.min(E.goal,99),1,99)} ${E.goal===1?'double-tap':'double-taps'}</div>
+      ${E.goal>1?`<input id="f-unit" value="${esc(E.unit)}" maxlength="16" placeholder="What you count, like glasses or pages" autocomplete="off" aria-label="What you count">`:''}</div>`:''}
+    ${E.kind==='counter'?'':`<div class="field"><span class="lab">Reminder</span><div class="seg">${[['default',S.settings.remind?`Default (${fmtTime(S.settings.remindAt)})`:'Default (off)'],['custom','Own time'],['off','Off']].map(([v,l])=>`<button type="button" data-act="rmode" data-v="${v}" aria-pressed="${E.remindMode===v}">${l}</button>`).join('')}</div>
       ${E.remindMode==='custom'?`<input type="time" id="f-remind" value="${esc(E.remindAt||S.settings.remindAt)}" style="width:auto" aria-label="Reminder time">`:''}<small class="hint">Only on days it's scheduled, and never once it's done.</small></div>
-    <div class="field"><span class="lab">Free misses</span><div class="row">${stepper('freezes',E.freezes,0,5)} per ${sc.type==='perMonth'?'year':'month'}</div>
-      <small class="hint">Covers a missed ${unit} so the streak survives.</small></div>
+    <div class="field"><span class="lab">Free misses</span><div class="row">${stepper('freezes',E.freezes,0,5)} per ${E.kind==='streak'&&sc.type==='perMonth'?'year':'month'}</div>
+      <small class="hint">Covers a missed ${E.kind==='goal'?E.period:unit} so the streak survives.</small></div>`}
     ${canShare?`<div class="field"><div class="switch-row"><span class="sl">Show to friends<small>People who add you can see this streak and its photo.</small></span><button type="button" class="tg" role="switch" aria-checked="${!E.hidden}" data-act="hideToggle" aria-label="Show to friends"></button></div></div>`:''}
     <div class="field"><span class="lab">Color</span><div class="swatches">${COLORS.map(c=>`<button type="button" class="sw" style="--c:${c}" data-act="color" data-v="${c}" aria-pressed="${E.color===c}" aria-label="Color ${c}"></button>`).join('')}<label class="sw custom${customColor?' sel':''}" style="--c:${E.color}" title="Pick any color"><input type="color" id="f-color" value="${E.color}" aria-label="Pick any color"></label></div></div>
     <div class="field"><span class="lab">Icon when there's no photo</span><div class="icons">${ICONS.map(i=>`<button type="button" class="ib" data-act="icon" data-v="${esc(i)}" aria-pressed="${E.icon===i}" aria-label="Icon ${esc(i)}">${i}</button>`).join('')}</div>
@@ -963,7 +1002,12 @@ function editorHTML(){
       <div class="presets" role="group" aria-label="Preset pictures">${PRESETS.map(([ic,c],i)=>`<button type="button" class="preset" style="--hc:${c}" data-act="preset" data-i="${i}" aria-pressed="${!E.photo&&E.icon===ic&&E.color===c}" aria-label="Picture ${ic}">${ic}</button>`).join('')}</div>
       ${sh.photoNote?`<small class="hint">${esc(sh.photoNote)}</small>`:''}${sh.photoErr?`<small class="err">${esc(sh.photoErr)}</small>`:''}${E.photo?'':nativeFile('f-photo2')}</div>
     <div class="field"><label class="lab" for="f-name">Title</label><input id="f-name" value="${esc(E.name)}" maxlength="40" placeholder="Read 20 pages" autocomplete="off"><small class="err" id="nameErr" hidden>Give it a title.</small></div>
-    <div class="field"><span class="lab">How often</span><div class="seg">${main.map(segBtn).join('')}${other.filter(([v])=>v===sc.type).map(segBtn).join('')}</div>${det}</div>
+    <div class="field"><span class="lab">Type</span><div class="seg">${[['streak','Streak'],['counter','Counter'],['goal','Goal']].map(([v,l])=>`<button type="button" data-act="ktype" data-v="${v}" aria-pressed="${E.kind===v}">${l}</button>`).join('')}</div>
+      <small class="hint">${E.kind==='counter'?'Count anything, with no schedule and no missed days.':E.kind==='goal'?'Reach a number each day or each week, like 20 pages.':'Do it on a schedule and keep the chain going.'}</small></div>
+    ${E.kind==='streak'?`<div class="field"><span class="lab">How often</span><div class="seg">${main.map(segBtn).join('')}${other.filter(([v])=>v===sc.type).map(segBtn).join('')}</div>${det}</div>`
+    :E.kind==='counter'?`<div class="field"><label class="lab" for="f-unit">What you count</label><input id="f-unit" value="${esc(E.unit)}" maxlength="16" placeholder="books, games won, workouts" autocomplete="off"></div>${stepField}`
+    :`<div class="field"><label class="lab" for="f-goal">Target</label><div class="row"><input type="number" id="f-goal" inputmode="numeric" min="1" max="99999" value="${E.goal}" style="width:104px"><input id="f-unit" value="${esc(E.unit)}" maxlength="16" placeholder="pages, push-ups, minutes" autocomplete="off" aria-label="Unit" style="flex:1;width:auto"></div></div>
+    <div class="field"><span class="lab">Resets</span><div class="seg">${[['day','Every day'],['week','Every week']].map(([v,l])=>`<button type="button" data-act="gper" data-v="${v}" aria-pressed="${E.period===v}">${l}</button>`).join('')}</div></div>${stepField}`}
     <div class="actions split"><button class="btn primary" data-act="save">${sh.isNew?'Add streak':'Save'}</button><button class="btn" data-act="cancel">Cancel</button></div>
     <button type="button" class="more-btn" data-act="more" aria-expanded="${!!sh.more}">${sh.more?'Fewer options':'More options'}${sh.more?I.up:I.down}</button>
     ${more}
@@ -994,7 +1038,7 @@ function personHTML(id){
   else if(p.private)body='<p class="muted-note">This profile is private.</p>';
   else if(!hs)body='<p class="muted-note">Loading streaks…</p>';
   else if(!Object.keys(hs).length)body='<p class="muted-note">No public streaks yet.</p>';
-  else body=`<div class="grid">${pubList(hs).map(h=>{const e=evaluate(h,t);return `<button class="tile" data-act="fopen" data-pid="${id}" data-id="${h.id}" style="${hcStyle(h)}" aria-label="${esc(`${nameOf(h)}: ${e.cur} ${uw(e.unit,e.cur)}`)}"><span class="media">${vis(h)}<span class="tile-streak"><b>${e.cur}</b><small>${uw(e.unit,e.cur)}</small></span>${e.doneToday?`<span class="badge on">${I.check}</span>`:''}</span><span class="tile-body"><span class="nm">${esc(nameOf(h))}</span><span class="meta">${esc(statusText(h,e,t))}</span>${stripHTML(h,e,t,true)}</span></button>`;}).join('')}</div>`;
+  else body=`<div class="grid">${pubList(hs).map(h=>{const e=evaluate(h,t);return `<button class="tile" data-act="fopen" data-pid="${id}" data-id="${h.id}" style="${hcStyle(h)}" aria-label="${esc(`${nameOf(h)}: ${showNum(h,e).join(' ')}`)}"><span class="media">${vis(h)}<span class="tile-streak"><b>${showNum(h,e)[0]}</b><small>${esc(showNum(h,e)[1])}</small></span>${e.doneToday?`<span class="badge on">${I.check}</span>`:''}</span><span class="tile-body"><span class="nm">${esc(nameOf(h))}</span><span class="meta">${esc(statusText(h,e,t))}</span>${stripHTML(h,e,t,true)}</span></button>`;}).join('')}</div>`;
   return `<div class="sh-head"><span></span><button class="icon-btn" data-act="close" aria-label="Close">${I.x}</button></div>
   <div class="detail"><div class="phead">${avatarHTML(id,'av-xl')}<h3>${esc(displayName(id))}</h3>${p&&p.bio?`<p>${esc(p.bio)}</p>`:''}
     <div class="row">${fol?`<button class="btn sm" data-act="unfollow" data-id="${id}">Remove</button>`:`<button class="btn sm primary" data-act="follow" data-id="${id}">Add</button>`}</div></div>${body}</div>`;
@@ -1282,8 +1326,9 @@ document.addEventListener('click',e=>{
   switch(a){
     case 'card':return cardTap(id);
     case 'tab':{if(ui.tab===b.dataset.v)return window.scrollTo({top:0,behavior:'smooth'});ui.tab=b.dataset.v;ui.reorder=false;try{localStorage.setItem(TABKEY,ui.tab);}catch(x){}render();const mn=$('main');mn.classList.remove('enter');void mn.offsetWidth;mn.classList.add('enter');return window.scrollTo(0,0);}
-    case 'inc':return adjust(id,1);
-    case 'dec':return adjust(id,-1);
+    case 'inc':return adjust(id,1,sh&&sh.sel);
+    case 'dec':return adjust(id,-1,sh&&sh.sel);
+    case 'dsel':sh.sel=+b.dataset.d;return renderSheet();
     case 'rest':return toggleRest(id);
     case 'day':return cycleDay(sh.id,+b.dataset.d);
     case 'mprev':sh.month=addMonths(sh.month,-1);return renderSheet();
@@ -1311,6 +1356,8 @@ document.addEventListener('click',e=>{
     case 'preset':{const [ic,c]=PRESETS[+b.dataset.i];Object.assign(sh.draft,{icon:ic,color:c,photo:'',photoOk:false});sh.photoNote='';sh.photoErr='';return renderSheet();}
     case 'avatar':{const [ic,c]=AVATARS[+b.dataset.i];sh.avatarIdx=+b.dataset.i;sh.draft.photo=presetImage(ic,c);sh.draft.photoOk=true;sh.photoErr='';return renderSheet();}
     case 'rmode':sh.draft.remindMode=b.dataset.v;if(b.dataset.v==='custom'&&!sh.draft.remindAt)sh.draft.remindAt=S.settings.remindAt;return renderSheet();
+    case 'ktype':{const d=sh.draft;d.kind=b.dataset.v;if(d.kind==='goal'&&d.goal<2)d.goal=10;return renderSheet();}
+    case 'gper':sh.draft.period=b.dataset.v;return renderSheet();
     case 'more':sh.more=!sh.more;return renderSheet();
     case 'reorderStart':closeSheet();ui.tab='mine';ui.reorder=true;render();return window.scrollTo(0,0);
     case 'save':return saveDraft();
@@ -1354,7 +1401,9 @@ document.addEventListener('input',e=>{
       case 'f-name':d.name=t.value;$('#nameErr').hidden=true;break;
       case 'f-icon':{const v=graphemes(t.value.trim(),2);if(v){d.icon=v;if(!d.photo){const g=document.querySelector('.pp .glyph');if(g)g.textContent=v;}document.querySelectorAll('.ib').forEach(x=>x.setAttribute('aria-pressed',String(x.dataset.v===v)));}break;}
       case 'f-color':if(HEX.test(t.value)){d.color=t.value.toLowerCase();const p=document.querySelector('.pp');if(p)p.style.setProperty('--hc',d.color);}break;
-      case 'f-unit':d.unit=t.value;break;
+      case 'f-unit':d.unit=t.value;{const h=document.querySelector('#f-step + .hint');if(h)h.textContent=t.value;}break;
+      case 'f-goal':d.goal=clamp(parseInt(t.value,10)||1,1,99999);break;
+      case 'f-step':d.step=clamp(parseInt(t.value,10)||1,1,1000);break;
       case 'f-group':d.group=t.value;break;
       case 'f-start':if(DATE.test(t.value))d.start=t.value;break;
       case 'f-note':d.note=t.value;break;
@@ -1483,7 +1532,7 @@ function onSnap(snap){
 const P={want:new Map(),inflight:new Set()};
 let syncT;
 const syncPublic=()=>{clearTimeout(syncT);syncT=setTimeout(doSync,600);};
-const pubBody=h=>clean({id:h.id,name:h.name,icon:h.icon,photo:h.photoOk?h.photo:'',color:h.color,sched:h.sched,goal:h.goal,unit:h.unit,start:h.start,freezes:h.freezes,log:h.log,skip:h.skip,order:h.order});
+const pubBody=h=>clean({id:h.id,kind:h.kind,step:h.step,period:h.period,name:h.name,icon:h.icon,photo:h.photoOk?h.photo:'',color:h.color,sched:h.sched,goal:h.goal,unit:h.unit,start:h.start,freezes:h.freezes,log:h.log,skip:h.skip,order:h.order});
 function doSync(){
   const uid=social.uid;
   if(!social.db||!uid||!social.ownReady||!social.pReady||social.blocked||!(store.mode==='cloud'&&store.ready))return;
