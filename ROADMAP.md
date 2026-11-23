@@ -17,6 +17,13 @@ Stage 1, critical data reliability: **built and tested on branch `reliability-ph
 - Save receipts (database migration 0004, applied; undo script in `supabase/rollback/`): the database records each save's stamp in the same step as the save and refuses a stamp it has seen, so one save is applied once. After a lost answer, the app asks the database whether its save landed, even if another phone has saved over it since. People can read only their own receipts; only the database writes them. Receipts are kept 60 days.
 - Version gate (same migration, switched off): saves carry the app version (`APP`, 2 for Stage 1). The database refuses saves below a minimum kept in `private.config` (`min_app` for everyone, `min_app:<user id>` for one account). It starts at 0, which refuses nothing. When it refuses this version, the app says to reload and keeps the changes on the phone.
 
+- Saves too old to confirm: receipts are kept 60 days. If a phone returns after more than 55 days with a save whose answer it never got, and no receipt is left, the app can't know whether that save landed. It then treats it as landed (so nothing is counted twice and nothing another phone removed comes back), keeps any changes made after it, and shows a note asking the person to check the days that save changed. A new streak made in such a save is kept rather than lost, and the note says so.
+
+#### Going back to the previous version (rollback)
+1. If the version gate is on, set it to 0 first (see below), so the previous version can save.
+2. Put the previous `app/unbroken.html` back on `main`, and publish `tools/rollback/sw.js` as the site's `sw.js` (in `tools/standalone.sh`, copy it instead of `app/sw.js`). It removes the offline helper from people's browsers on their next open; their saved streaks and unsent changes are untouched and the previous version saves them.
+3. The database can stay as it is: the previous version works with the receipts table and the gate switched off (tested).
+
 #### Version gate: rollout and rollback
 1. Now: off (`min_app` = 0). Every version saves as before.
 2. After Stage 1 goes live, check that older versions have stopped saving. This counts streaks saved in the last 14 days by a version without a version number (it should reach 0):

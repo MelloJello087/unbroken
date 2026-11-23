@@ -116,7 +116,7 @@ test('syncing: friends see public streaks, and a streak made private disappears 
   assert.deepEqual([...a.errors, ...b.errors], []);
 });
 
-let helpers, oldHtml = null;
+let helpers, oldHtml = null, rolledBack = false;
 async function appHelpers() {
   if (helpers) return helpers;
   const { launch, devices, ROOT } = require('./lib/browser.cjs');
@@ -134,6 +134,7 @@ async function appHelpers() {
     const p = q.url.split('?')[0], f = p === '/sw.js' ? path.join(ROOT, 'dist/sw.js') : p === '/' ? dist : null;
     if (!f) { s.writeHead(404); return s.end(); }
     if (p === '/' && /[?&]v=old/.test(q.url) && oldHtml) { s.writeHead(200, { 'Content-Type': 'text/html' }); return s.end(oldHtml); }   // the previous version, kept through reloads
+    if (rolledBack && oldHtml) { s.writeHead(200, { 'Content-Type': p === '/' ? 'text/html' : 'text/javascript' }); return s.end(p === '/' ? oldHtml : fs.readFileSync(path.join(ROOT, 'tools/rollback/sw.js'))); }   // the site after a rollback
     s.writeHead(200, { 'Content-Type': f.endsWith('.js') ? 'text/javascript' : 'text/html', 'Cache-Control': 'max-age=600' }); s.end(fs.readFileSync(f));
   }).listen(0);
   const port = await new Promise(r => server.on('listening', () => r(server.address().port)));
@@ -515,4 +516,76 @@ test('moving from the version live today to this one: a change made offline in t
   assert.equal(await until(n, 2, O.page), 2, 'the old version\'s offline check-in arrives, once');
   await O.page.waitForTimeout(3000); assert.equal(await n(), 2);
   await O.ctx.close();
+});
+
+/* ---------- Saves too old to confirm (receipt expired) ---------- */
+// Makes A's unconfirmed save look 70 days old and removes its receipt, as the 60-day clean-up would.
+// Lets the next save through to the account (landed) or not (lost), then drops the connection before the answer arrives.
+async function dropDuringSave(ph, name, landed) {
+  let done = false;
+  await ph.ctx.route(`https://${HOST()}/rest/v1/user_docs*`, async r => { if (!done && r.request().method() === 'PATCH') { if (landed) await r.fetch(); await cut(ph.ctx); done = true; return r.abort('connectionreset'); } return r.continue(); });
+  await taps(ph, name, 1);
+  for (let i = 0; i < 30 && !done; i++) await ph.page.waitForTimeout(200);
+  await ph.ctx.unroute(`https://${HOST()}/rest/v1/user_docs*`); assert.ok(done, 'the connection dropped during the save');
+}
+// Done with the app closed (a blank page on the same site), so the running app can't write over the edit; then opens Motif again.
+async function ageUnsure(ph) {
+  const home = new URL(ph.page.url()).origin + '/';
+  await ph.page.goto(home + 'blank');
+  const revs = await ph.page.evaluate(() => { const k = Object.keys(localStorage).find(x => x.startsWith('unbroken:v1:')), o = JSON.parse(localStorage.getItem(k)), r = [];
+    for (const ts of Object.values(o.tries || {})) for (const t of ts) { t.at = Date.now() - 70 * 864e5; r.push(t.rev); } localStorage.setItem(k, JSON.stringify(o)); return r; });
+  assert.ok(revs.length >= 1, 'there is an unconfirmed save');
+  await sql(`delete from public.save_receipts where rev in (${revs.map(r => `'${r}'`).join(',')})`);
+  await ph.page.goto(home);
+}
+const noteOn = page => page.$$eval('.unsure', x => x.map(e => e.textContent).join(' '));
+test('old unconfirmed save (real database): it landed, another phone added since, its receipt expired: counted once, and a note asks to check', { skip: dskip }, async () => {
+  const { A, B } = await newCounter('Expired landed');
+  await dropDuringSave(A, 'Expired landed', true);
+  assert.equal(await until(() => dayOf('Expired landed'), 1, B.page), 1, "A's save reached the account");
+  await B.page.reload(); await B.page.waitForSelector(tile('Expired landed')); await taps(B, 'Expired landed', 1);
+  assert.equal(await until(() => dayOf('Expired landed'), 2, B.page), 2);
+  await ageUnsure(A); await A.page.waitForSelector(tile('Expired landed'));
+  await back(A); await A.page.waitForTimeout(8000);
+  assert.equal(await dayOf('Expired landed'), 2, '2, not 3');
+  assert.match(await noteOn(A.page), /Check Expired landed/);
+});
+test('old unconfirmed save (real database): it never landed, another phone added: not added on a guess, and a note asks to check', { skip: dskip }, async () => {
+  const { A, B } = await newCounter('Expired lost');
+  await dropDuringSave(A, 'Expired lost', false);
+  await taps(B, 'Expired lost', 1); assert.equal(await until(() => dayOf('Expired lost'), 1, B.page), 1);
+  await ageUnsure(A); await A.page.waitForSelector(tile('Expired lost'));
+  await back(A); await A.page.waitForTimeout(8000);
+  assert.equal(await dayOf('Expired lost'), 1, 'not re-added on a guess');
+  assert.match(await noteOn(A.page), /Check Expired lost[\s\S]*couldn't be confirmed/, 'the person is told, not left with a silent gap');
+});
+test('old unconfirmed save (real database): a streak deleted on another phone stays deleted', { skip: dskip }, async () => {
+  const { A, B } = await newCounter('Expired deleted');
+  await dropDuringSave(A, 'Expired deleted', false);
+  await B.page.tap(tile('Expired deleted')); await B.page.waitForSelector('#sheet .detail'); await B.page.tap('[data-act="ddel"]'); await B.page.tap('[data-act="ddelyes"]');
+  assert.equal(await until(() => dayOf('Expired deleted'), null, B.page), null);
+  await ageUnsure(A); await A.page.waitForSelector('.tile,.empty-card');
+  await back(A); await A.page.waitForTimeout(8000);
+  assert.equal(await dayOf('Expired deleted'), null, 'not brought back');
+  assert.equal(await A.page.$$eval(tile('Expired deleted'), x => x.length), 0);
+});
+
+/* ---------- Rollback ---------- */
+test('rollback: going back to the previous version removes the offline helper, and a change waiting offline is still saved', { skip: dskip }, async () => {
+  const { A } = await newCounter('Rollback');
+  await A.page.reload(); await A.page.waitForSelector(tile('Rollback')); await A.page.waitForTimeout(1500);
+  assert.ok(await A.page.evaluate(() => navigator.serviceWorker.controller !== null), 'the offline helper is running');
+  await cut(A.ctx); await taps(A, 'Rollback', 1);               // waiting offline
+  const now = fs.readFileSync(path.join(__dirname, '../dist/index.html'), 'utf8'), cur = fs.readFileSync(path.join(__dirname, '../app/unbroken.html'), 'utf8');
+  oldHtml = now.split(cur).join(OLD_APP()); rolledBack = true;
+  try {
+    await uncut(A.ctx); await A.page.reload().catch(() => {});
+    await A.page.waitForFunction(() => !document.documentElement.outerHTML.includes('mergeDoc') && document.querySelector('.tile'), null, { timeout: 30000 });
+    assert.equal(await until(() => dayOf('Rollback'), 1, A.page), 1, 'the previous version saved the waiting change, once');
+    await A.page.waitForTimeout(3000);
+    assert.equal(await A.page.evaluate(async () => (await navigator.serviceWorker.getRegistrations()).length), 0, 'offline helper removed');
+    assert.deepEqual(await A.page.evaluate(async () => (await caches.keys()).filter(k => k.startsWith('motif-'))), [], 'its saved copy removed');
+    assert.equal(await dayOf('Rollback'), 1);
+  } finally { rolledBack = false; }
+  await A.page.reload(); await A.page.waitForFunction(() => document.documentElement.outerHTML.includes('mergeDoc'), null, { timeout: 20000 });   // back to this version for the tests after
 });

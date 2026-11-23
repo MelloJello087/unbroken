@@ -488,6 +488,7 @@ let KEY='unbroken:v1';
 // Sent with every save; raise it when a release changes how saving works (see ROADMAP.md, version gate).
 const APP=2;
 const TABKEY='unbroken:tab', DAY=864e5;
+const UNSURE_AGE=55*DAY;   // save receipts are kept 60 days
 const DN=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'], DNL=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'], DL=['S','M','T','W','T','F','S'];
 const MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'], MONL=['January','February','March','April','May','June','July','August','September','October','November','December'];
 const THEMES={forest:['Forest','#0f1712','#16201a','#9bcf74'],moss:['Moss','#eef1e9','#fbfcf8','#3f6f2c'],midnight:['Midnight','#0d1119','#141a25','#93b1ff'],ember:['Ember','#16110e','#1e1814','#eda26a'],sand:['Sand','#f1ede4','#fcfaf5','#5c6b25'],ocean:['Ocean','#eaf1f2','#fafcfc','#1b6676']};
@@ -589,7 +590,7 @@ const nativeFile=id=>`<label class="hint native">Upload not opening? <input type
 /* ---------- State ---------- */
 let S={habits:{},settings:{...DEF},social:{following:[]}}, cacheMode='local', lastT=0;
 const store={mode:'connecting',ready:false,col:null,unsub:null,why:''};
-const W={pending:new Map(),inflight:new Set(),timers:new Map(),retry:new Map(),base:new Map(),known:new Map(),tries:new Map()};
+const W={pending:new Map(),inflight:new Set(),timers:new Map(),retry:new Map(),base:new Map(),known:new Map(),tries:new Map(),unsure:[]};
 const ui={tab:'mine',reorder:false,showHidden:false,sheet:null,lastFocus:null,dl:null,hadCache:false};
 const social={db:null,user:null,uid:null,can:null,blocked:false,profiles:{},pReady:false,ownKnown:new Map(),ownReady:false,streaks:{},subs:new Map(),peek:{},names:{},avatars:{},leaving:false};
 try{if(localStorage.getItem(TABKEY)==='friends')ui.tab='friends';}catch(e){}
@@ -831,7 +832,7 @@ function renderMine(t){
     const doneNow=h=>{const e=evs.get(h.id);return e.doneToday||!!(e.period&&e.period.target&&e.period.count>=e.period.target);};
     if(S.settings.hideDone&&!ui.reorder&&!ui.showHidden){const b=arr.length;arr=arr.filter(h=>!doneNow(h));hidden=b-arr.length;}
     const grid=S.settings.layout==='grid'&&!ui.reorder;
-    let html=ui.reorder?'':recapCardHTML(t)+reminderHTML(active,evs,t);
+    let html=ui.reorder?'':unsureHTML()+recapCardHTML(t)+reminderHTML(active,evs,t);
     html+=ui.reorder?`<div class="reorder-bar"><span>Use the arrows to change the order.</span><button class="btn sm primary" data-act="reorder">Done</button></div>`:'';
     html+=groupList(arr).map(([g,hs])=>`<section class="group">${g?`<h2 class="grp">${esc(g)}</h2>`:''}<div class="${grid?'grid':'cards'}">${hs.map(h=>grid?tileHTML(h,evs.get(h.id),t):cardHTML(h,evs.get(h.id),t)).join('')}</div></section>`).join('');
     const na=Object.values(S.habits).filter(h=>h.archived).length;
@@ -990,6 +991,9 @@ function weekStats(ws){
   return r;
 }
 const vs=(a,b,unit='')=>a==null||b==null?'':a===b?'same as the week before':`${a>b?'+':'−'}${Math.abs(a-b)}${unit} on the week before`;
+function unsureHTML(){
+  return W.unsure.map((u,i)=>`<div class="recap-card unsure" role="status"><div class="recap-t"><b>${u.kept?`${esc(u.name||'A streak')} is back`:`Check ${esc(u.name||'a streak')}`}</b><span>${u.kept?"You made it while offline long ago. Motif couldn't confirm whether it was deleted on another device, so it was kept.":`A change you made while offline long ago couldn't be confirmed${u.days.length?`: ${u.days.slice(0,3).map(d=>fmt(dnOf(d))).join(', ')}${u.days.length>3?` and ${u.days.length-3} more`:''}`:''}${u.other?(u.days.length?', and its details':' (its details)'):''}. Check it's right.`}</span></div>${S.habits[u.id]?`<button type="button" class="btn sm" data-act="unsureCheck" data-i="${i}">Check</button>`:''}<button type="button" class="icon-btn sm" data-act="unsureHide" data-i="${i}" aria-label="Dismiss">${I.x}</button></div>`).join('');
+}
 function recapCardHTML(t){
   const ws=weekStartOf(t);if(t-ws>1)return '';
   const last=ws-7;if(S.settings.recapSeen===keyOf(last))return '';
@@ -1419,6 +1423,8 @@ document.addEventListener('click',e=>{
     case 'archived':return openSheet({kind:'archived'});
     case 'recap':{const w=b.dataset.d!=null?+b.dataset.d:weekStartOf(today())-7;if(S.settings.recapSeen!==keyOf(w)&&w===weekStartOf(today())-7)setSetting('recapSeen',keyOf(w));return openSheet({kind:'recap',ws:w});}
     case 'recapSeen':return setSetting('recapSeen',keyOf(+b.dataset.d));
+    case 'unsureCheck':{const u=W.unsure[+b.dataset.i];if(!u)return;W.unsure=W.unsure.filter(x=>x!==u);saveLocal();render();return S.habits[u.id]&&openSheet({kind:'detail',id:u.id,month:monthStartOf(u.days.length?dnOf(u.days[0]):today())});}
+    case 'unsureHide':W.unsure=W.unsure.filter((x,i)=>i!==+b.dataset.i);saveLocal();return render();
     case 'recapNav':sh.ws+=+b.dataset.d;return renderSheet();
     case 'reorder':ui.reorder=!ui.reorder;return render();
     case 'up':return move(id,-1);
@@ -1547,7 +1553,7 @@ function saveLocal(){
   const dirty={},base={};for(const [id,b] of W.pending)dirty[id]=b===null?0:1;
   for(const id of W.inflight)if(!(id in dirty))dirty[id]=id==='settings'||id==='social'||S.habits[id]?1:0;
   const tries={};for(const id of Object.keys(dirty)){if(W.base.has(id))base[id]=W.base.get(id);if(W.tries.has(id))tries[id]=W.tries.get(id);}
-  const o={v:2,mode:cacheMode,habits:S.habits,settings:S.settings,social:S.social,dirty,base,tries,srv:[...W.known.keys()]};
+  const o={v:2,mode:cacheMode,habits:S.habits,settings:S.settings,social:S.social,dirty,base,tries,srv:[...W.known.keys()],unsure:W.unsure};
   try{localStorage.setItem(KEY,JSON.stringify(o));return full(false);}catch(e){}
   if(cacheMode==='cloud')try{const h={};for(const [id,x] of Object.entries(S.habits))h[id]=id in dirty||!x.photo?x:{...x,photo:''};
     for(const id of Object.keys(base))if(base[id]&&base[id].photo)base[id]={...base[id],photo:''};
@@ -1565,11 +1571,12 @@ function loadLocal(){
     S.settings=normSettings(o.settings);S.social=normSocial(o.social);
     for(const [id,h] of Object.entries(o.habits||{}))if(SEG.test(id)&&h&&typeof h==='object')S.habits[id]=normHabit({...h,id});
     cacheMode=o.mode==='cloud'?'cloud':'local';
+    if(Array.isArray(o.unsure))W.unsure=o.unsure.filter(u=>u&&SEG.test(u.id)&&typeof u.name==='string'&&Array.isArray(u.days)).map(u=>({id:u.id,name:u.name.slice(0,60),days:u.days.filter(d=>DATE.test(d)).slice(0,31),other:!!u.other,kept:!!u.kept})).slice(0,20);
     const dirty=o.dirty&&typeof o.dirty==='object'?o.dirty:{},base=o.base&&typeof o.base==='object'?o.base:{},tries=o.tries&&typeof o.tries==='object'?o.tries:{};
     for(const [id,alive] of Object.entries(dirty))if(SEG.test(id)){
       W.pending.set(id,id==='settings'?{...S.settings}:id==='social'?{...S.social}:alive&&S.habits[id]?clean(S.habits[id]):null);
       if(id in base)W.base.set(id,base[id]&&typeof base[id]==='object'?normDoc(id,base[id]):null);
-      const ts=(Array.isArray(tries[id])?tries[id]:[tries[id]]).filter(t=>t&&typeof t.rev==='string'&&(t.sent===null||isObj(t.sent))).map(t=>({rev:t.rev,sent:t.sent&&normDoc(id,t.sent),...(isObj(t.out)?{out:normDoc(id,t.out)}:{}),...(typeof t.ver==='string'||t.ver===null?{ver:t.ver}:{})}));if(ts.length)W.tries.set(id,ts);
+      const ts=(Array.isArray(tries[id])?tries[id]:[tries[id]]).filter(t=>t&&typeof t.rev==='string'&&(t.sent===null||isObj(t.sent))).map(t=>({rev:t.rev,sent:t.sent&&normDoc(id,t.sent),...(isObj(t.out)?{out:normDoc(id,t.out)}:{}),...(typeof t.ver==='string'||t.ver===null?{ver:t.ver}:{}),...(Number.isFinite(t.at)?{at:t.at}:{}),...(isObj(t.base)||t.base===null?{base:t.base&&normDoc(id,t.base)}:{})}));if(ts.length)W.tries.set(id,ts);
     }
     // Only what the account was seen to hold counts as known; settings and the follow list may never have been saved there.
     if(cacheMode==='cloud'){const srv=Array.isArray(o.srv)?new Set(o.srv):null;
@@ -1591,16 +1598,19 @@ async function flush(id){
       const cur=typeof ref.get==='function'?await ref.get():null,raw=cur&&cur.exists?cur.data()||{}:null,remote=raw?normDoc(id,raw):null,ver=cur&&cur.exists?cur.version:null;
       // Earlier saves whose answer was lost: if one reached the account (its stamp is there, or the account's receipt says so,
       // even after another phone saved over it), count it as done so nothing is added twice. One that can no longer land is dropped.
-      let ts=W.tries.get(id)||[],hit=null;
-      for(const t of [...ts].reverse()){if(raw&&raw.rev===t.rev){hit=[t,remote];break;}if(t.out!==undefined&&typeof ref.landed==='function'&&await ref.landed(t.rev)){hit=[t,t.out];break;}}
+      let ts=W.tries.get(id)||[],hit=null,unsure=null;
+      for(const t of [...ts].reverse()){if(raw&&raw.rev===t.rev){hit=[t,remote];break;}if(t.out!==undefined&&typeof ref.landed==='function'){if(await ref.landed(t.rev)){hit=[t,t.out];break;}if(!unsure&&Number.isFinite(t.at)&&Date.now()-t.at>=UNSURE_AGE)unsure=t;}}
       if(hit){ts=[];body=mergeDoc(hit[0].sent,body,hit[1]);base=hit[1];W.base.set(id,base);}
+      // Too old for its receipt to still exist, so whether it landed can't be known: treat it as landed (never add it twice,
+      // never bring back what another phone removed) and tell the person which days to check. A new streak is kept, not lost.
+      else if(unsure){ts=[];const u=unsureNote(id,unsure,remote);if(remote){body=mergeDoc(unsure.sent,body,remote);base=remote;W.base.set(id,base);}else if(unsure.base===null){base=null;W.base.set(id,null);}if(u)addUnsure(u);}
       else if(typeof ref.landed==='function')ts=ts.filter(t=>t.ver!==undefined&&t.ver===ver);
       if(ts.length)W.tries.set(id,ts);else W.tries.delete(id);
       out=!cur?body:remote===null&&(id==='settings'||id==='social')?body:mergeDoc(base,body,remote);
       try{
         if(out===null){if(!cur||remote)await ref.delete();}
         else if(!remote||!same(out,remote)){
-          const rev=Math.random().toString(36).slice(2,9)+Date.now().toString(36);W.tries.set(id,[...(W.tries.get(id)||[]).slice(-4),{rev,sent:body,out,ver}]);saveLocal();
+          const rev=Math.random().toString(36).slice(2,9)+Date.now().toString(36);W.tries.set(id,[...(W.tries.get(id)||[]).slice(-4),{rev,sent:body,out,ver,at:Date.now(),base:base===undefined?undefined:base}]);saveLocal();
           await (ACCOUNTS?ref.set({...out,rev,app:APP},{version:cur&&cur.exists?cur.version:null}):ref.set({...out,rev,app:APP}));
         }
         W.tries.delete(id);break;
@@ -1623,6 +1633,18 @@ async function flush(id){
   if(ok)schedule(id,50);else if(again)schedule(id,again);
 }
 // After a save: remember what the account now holds, and fold in anything another device added.
+// Which parts of an unconfirmable save the account doesn't clearly show.
+function unsureNote(id,t,remote){
+  if(id==='settings'||id==='social')return null;
+  const nm=nameOf(t.sent||t.out||{}),b=t.base||{},s=t.sent||{};
+  if(!remote)return t.base===null?{id,name:nm,days:[],other:false,kept:true}:null;
+  const days=new Set();
+  // Every day the save changed is listed: even when the account shows the same value, another phone could have made it.
+  for(const k of ['log','skip']){const bk=b[k]||{},sk=s[k]||{};for(const d of new Set([...Object.keys(bk),...Object.keys(sk)]))if((sk[d]||0)!==(bk[d]||0))days.add(d);}
+  const other=Object.keys({...s,...b}).some(k=>!['log','skip','id','created'].includes(k)&&!same(s[k],b[k]));
+  return days.size||other?{id,name:nm,days:[...days].sort().slice(0,31),other,kept:false}:null;
+}
+function addUnsure(u){W.unsure=[...W.unsure.filter(x=>x.id!==u.id),u].slice(-20);saveLocal();render();}
 function settle(id,sent,out){
   if(out===null)W.known.delete(id);else W.known.set(id,out);
   if(W.pending.has(id)){const next=mergeDoc(sent,W.pending.get(id),out);W.pending.set(id,next);W.base.set(id,out);if(!same(next,W.pending.get(id))||!same(sent,out))applyDoc(id,next);}

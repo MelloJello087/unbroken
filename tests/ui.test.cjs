@@ -760,3 +760,70 @@ test('syncing: memory from before this fix (no record of what the account holds)
   await page.tap('#tabFriends'); await page.waitForSelector('.prow'); await page.tap('.prow:has-text("Ana") [data-act="follow"]'); await page.waitForTimeout(2000);
   assert.deepEqual((await doc(page, 'social') || {}).following, ['u_ana']);
 });
+
+/* ---------- Saves too old to confirm (receipts expired) ---------- */
+// The phone remembers an unconfirmed save of h2 ("Drink water"): base = what the account had, sent = this phone's version.
+const OLD = 70 * 864e5, YOUNG = 40 * 864e5;
+function unsureCase({ store = {}, base = 3, sent = 4, later, age = OLD, keepReceipt = false, h = 'h2', create = false } = {}) {
+  const s = makeSeed({ friends: false }), cloud = JSON.parse(JSON.stringify(s.seed)), doc0 = JSON.parse(JSON.stringify(cloud['data/users/u_me/h2']));
+  const mk = n => ({ ...doc0, id: h, log: { ...doc0.log, [s.today]: n } }), b = create ? null : mk(base), sn = mk(sent), now = mk(later === undefined ? sent : later);
+  if (create) { sn.name = now.name = 'Made offline'; delete cloud['data/users/u_me/' + h]; }
+  for (const [k, v] of Object.entries(store)) if (v === null) delete cloud['data/users/u_me/' + k]; else cloud['data/users/u_me/' + k] = { ...doc0, log: { ...doc0.log, [s.today]: v } };
+  const mem = memory({ [h]: now }, { dirty: { [h]: 1 }, base: { [h]: b }, tries: { [h]: [{ rev: 'oldsave1', sent: sn, out: sn, at: Date.now() - age, base: b }] } });
+  return { s, open: () => openClaude({ init: ([m, arg, ls]) => { if (!sessionStorage.getItem('__planted')) { for (const [k, v] of Object.entries(ls)) localStorage.setItem(k, v); sessionStorage.setItem('__planted', '1'); } eval('(' + m + ')')(arg); if (arg.keep) window.__receipts.add('oldsave1'); }, initArg: [mockClaude.toString(), { seed: cloud, receipts: true, keep: keepReceipt }, mem] }) };
+}
+const count = (page, id, t) => page.evaluate(([i, t]) => { const d = window.__store.get('data/users/u_me/' + i); return d ? (d.log[t] || 0) : null; }, [id, t]);
+const unsureNote = page => page.$$eval('.unsure', x => x.map(e => e.textContent));
+test('old unconfirmed save: it had landed and another phone added since: nothing is counted twice, and the person is asked to check', async () => {
+  const c = unsureCase({ store: { h2: 5 } }); const { page, errors } = await c.open(); await settle(page);
+  assert.equal(await count(page, 'h2', c.s.today), 5, '5, not 6');
+  assert.match((await unsureNote(page)).join(), /Check Drink water[\s\S]*couldn't be confirmed: \w{3} \d+\. Check/, 'names the day, and nothing else');
+  noErrors(errors);
+});
+test('old unconfirmed save: it never landed and another phone added: not guessed silently, the person is told which day to check', async () => {
+  const c = unsureCase({ store: { h2: 4 } }); const { page } = await c.open(); await settle(page);
+  assert.equal(await count(page, 'h2', c.s.today), 4, 'not added a second time');
+  const note = (await unsureNote(page)).join(); assert.match(note, /Check Drink water/); assert.match(note, /couldn't be confirmed: \w{3} \d+/, 'names the day');
+});
+test('old unconfirmed save: an undo made then is not reversed, and conflicting additions are flagged', async () => {
+  const c = unsureCase({ base: 1, sent: 0, store: { h2: 2 } }); const { page } = await c.open(); await settle(page);
+  assert.equal(await count(page, 'h2', c.s.today), 2, "the other phone's later addition is kept");
+  assert.equal((await unsureNote(page)).length, 1, 'and the person is asked to check');
+});
+test('old unconfirmed save: even when the account shows the same value, the person is still asked to check (another phone could have made it)', async () => {
+  const c = unsureCase({ store: { h2: 4 }, sent: 4 }); const { page } = await c.open(); await settle(page);
+  assert.equal(await count(page, 'h2', c.s.today), 4); assert.equal((await unsureNote(page)).length, 1);
+});
+test('old unconfirmed save: a streak deleted on another phone stays deleted, with no note', async () => {
+  const c = unsureCase({ store: { h2: null } }); const { page, errors } = await c.open(); await settle(page);
+  assert.equal(await count(page, 'h2', c.s.today), null); assert.equal(await page.$$eval('.tile[data-id="h2"]', x => x.length), 0);
+  assert.equal((await unsureNote(page)).length, 0); noErrors(errors);
+});
+test('old unconfirmed save: a streak made offline that never reached the account is kept, and the note says so', async () => {
+  const c = unsureCase({ create: true, h: 'h9', sent: 1 }); const { page } = await c.open(); await settle(page);
+  assert.equal(await count(page, 'h9', c.s.today), 1, 'saved, not lost');
+  assert.match((await unsureNote(page)).join(), /Made offline is back/);
+});
+test('old unconfirmed save: changes made after it still sync on top', async () => {
+  const c = unsureCase({ store: { h2: 4 }, sent: 4, later: 6 }); const { page } = await c.open(); await settle(page);
+  assert.equal(await count(page, 'h2', c.s.today), 6, "the account's 4 plus the 2 added later");
+});
+test('a save younger than the receipt period with no receipt is treated as not landed: normal merging, no note', async () => {
+  const c = unsureCase({ store: { h2: 4 }, age: YOUNG }); const { page } = await c.open(); await settle(page);
+  assert.equal(await count(page, 'h2', c.s.today), 5, 'independent check-ins add up as usual');
+  assert.equal((await unsureNote(page)).length, 0);
+});
+test('an old save whose receipt is still there is confirmed: no fallback, no note', async () => {
+  const c = unsureCase({ store: { h2: 5 }, keepReceipt: true }); const { page } = await c.open(); await settle(page);
+  assert.equal(await count(page, 'h2', c.s.today), 5); assert.equal((await unsureNote(page)).length, 0);
+});
+test('the note: Check opens the streak, the dismiss button hides it, and it stays hidden after a reload', async () => {
+  const c = unsureCase({ store: { h2: 5 } }); const { page, errors } = await c.open(); await settle(page);
+  await page.tap('.unsure [data-act="unsureCheck"]'); await page.waitForSelector('#sheet:not([hidden]) .detail');
+  assert.match(await page.textContent('#sheet'), /Drink water/); await closeSheet(page);
+  assert.equal((await unsureNote(page)).length, 0, 'gone once checked');
+  const d = unsureCase({ store: { h2: 5 } }); const r = await d.open(); await settle(r.page);
+  await r.page.tap('.unsure [data-act="unsureHide"]'); await r.page.reload(); await settle(r.page);
+  assert.equal((await unsureNote(r.page)).length, 0, 'stays dismissed');
+  noErrors(errors);
+});
