@@ -3,7 +3,16 @@
 Status: **Phases 0, 1 and 2 complete. Phase 3 waits for the owner's go-ahead.**
 Backup of the working version before any of this: branch `backup/v1.0-before-expansion`.
 
-## What already exists
+## Reliability fixes (after the audit)
+
+Stage 1, critical data reliability: **built and tested on branch `reliability-phase1`, not yet on `main` or the live pages.** Backup of the version before it: branch `backup/before-reliability-fixes`.
+- Two phones: changes are merged instead of replaced. Check-ins are combined day by day (counts made on both phones add up), a change to one setting doesn't undo another phone's change to a different one, deleting wins, and a deleted streak never comes back. The account version only saves if nothing changed since it last read; otherwise it merges and tries again.
+- Opening the account version with no connection, or with the login library unavailable, shows the streaks this phone remembers (with an "Offline" note) instead of an empty list or the login screen, and syncs when the connection returns.
+- Unsent changes are kept on the phone through reloads and keep retrying (every 30 seconds, and as soon as the phone is back online), with a visible "waiting to sync" note after repeated failures.
+- A full phone storage is reported instead of failing silently; when space is tight, photos already safe in the account are left out of the phone's copy.
+- An expired or revoked login asks the person to log in again, keeps their unsent changes and saves them afterwards.
+
+
 
 Several requested features are partly or fully built. The plan extends them rather than duplicating them.
 

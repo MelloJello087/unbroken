@@ -19,7 +19,7 @@ function load({ now, weekStart = 1, rollover = 0 } = {}) {
   vm.runInContext(src + `
     ;S.settings.weekStart=${weekStart};S.settings.rollover=${rollover};
     globalThis.M={S,DEF,evaluate,chainLinks,normHabit,normSettings,normSocial,normProfile,newHabit,keyOf,dnOf,dow,today,weekStartOf,
-      monthStartOf,monthEndOf,schedText,statusText,hasBad,maskBad,okImg,stable,onColor,uw,MILESTONES,COLORS,THEMES};`, ctx);
+      monthStartOf,monthEndOf,mergeDoc,normDoc,schedText,statusText,hasBad,maskBad,okImg,stable,onColor,uw,MILESTONES,COLORS,THEMES};`, ctx);
   return ctx.M;
 }
 module.exports = { load };

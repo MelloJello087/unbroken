@@ -247,3 +247,55 @@ test('milestones: weekly streaks use weeks (4, 12, 26, 52)', () => {
   const e = ev(habit({ sched: { type: 'perWeek', times: 3 }, start: '2026-10-12', log }));
   assert.equal(e.cur, 5); same(Object.keys(e.miles).map(Number), [4]);
 });
+
+/* ---------- Syncing between devices ---------- */
+// base = what this phone last saw in the account, local = this phone now, remote = the account now.
+const doc = o => M.normDoc('h1', { id: 'h1', name: 'Read', start: '2026-11-01', created: 1, log: {}, skip: {}, ...o });
+const merged = (b, l, r) => JSON.parse(JSON.stringify(M.mergeDoc(b, l, r)));
+test('syncing: check-ins made on two phones are both kept', () => {
+  const b = doc({ log: { '2026-11-16': 1 } });
+  const m = merged(b, doc({ log: { '2026-11-16': 1, '2026-11-17': 1 } }), doc({ log: { '2026-11-16': 1, '2026-11-18': 1 } }));
+  same(Object.keys(m.log).sort(), ['2026-11-16', '2026-11-17', '2026-11-18']);
+});
+test('syncing: an edit on this phone does not wipe a check-in made on the other phone', () => {
+  const b = doc({ log: { '2026-11-16': 1 } });
+  const m = merged(b, doc({ log: { '2026-11-16': 1 }, note: 'edited offline' }), doc({ log: { '2026-11-16': 1, '2026-11-18': 1 } }));
+  assert.equal(m.note, 'edited offline'); assert.equal(m.log['2026-11-18'], 1);
+});
+test('syncing: undoing a check-in on one phone removes it, even though the other phone still has it', () => {
+  const b = doc({ log: { '2026-11-17': 1, '2026-11-18': 1 } });
+  assert.equal(merged(b, doc({ log: { '2026-11-17': 1 } }), b).log['2026-11-18'], undefined);
+  assert.equal(merged(b, b, doc({ log: { '2026-11-17': 1 } })).log['2026-11-18'], undefined);
+});
+test('syncing: counts added on two phones on the same day add up', () => {
+  const b = doc({ log: { '2026-11-18': 2 } });
+  assert.equal(merged(b, doc({ log: { '2026-11-18': 5 } }), doc({ log: { '2026-11-18': 3 } })).log['2026-11-18'], 6);
+  assert.equal(merged(b, doc({ log: { '2026-11-18': 1 } }), doc({ log: { '2026-11-18': 3 } })).log['2026-11-18'], 2, 'one undo here, one more there');
+});
+test('syncing: different settings changed on each phone are both kept; the same one changed on both keeps this phone\'s', () => {
+  const b = doc({ color: '#5f8f3e', note: '' });
+  const m = merged(b, doc({ color: '#5f8f3e', note: 'mine' }), doc({ color: '#4f7aa3', note: '' }));
+  assert.equal(m.note, 'mine'); assert.equal(m.color, '#4f7aa3');
+  assert.equal(merged(b, doc({ name: 'Here' }), doc({ name: 'There' })).name, 'Here');
+});
+test('syncing: rest days and schedules merge like check-ins', () => {
+  const b = doc({ skip: {} });
+  const m = merged(b, doc({ skip: { '2026-11-17': 1 } }), doc({ skip: { '2026-11-16': 1 }, sched: { type: 'perWeek', times: 4 } }));
+  same(Object.keys(m.skip).sort(), ['2026-11-16', '2026-11-17']); assert.equal(m.sched.type, 'perWeek');
+});
+test('syncing: deleting wins, and a streak deleted on another phone is not brought back', () => {
+  const b = doc({ log: { '2026-11-16': 1 } });
+  assert.equal(M.mergeDoc(b, null, doc({ log: { '2026-11-16': 1, '2026-11-18': 1 } })), null, 'deleted here');
+  assert.equal(M.mergeDoc(b, doc({ note: 'edited offline' }), null), null, 'deleted on the other phone');
+});
+test('syncing: a new streak made on this phone is saved; with no record of the account\'s copy nothing is dropped', () => {
+  const l = doc({ log: { '2026-11-18': 1 } });
+  same(merged(null, l, null), JSON.parse(JSON.stringify(l)), 'new here');
+  same(merged(undefined, l, null), JSON.parse(JSON.stringify(l)), 'saved by an older version: kept');
+  const m = merged(undefined, doc({ log: { '2026-11-17': 1 } }), doc({ log: { '2026-11-18': 2 } }));
+  same(m.log, { '2026-11-17': 1, '2026-11-18': 2 });
+});
+test('syncing: people you follow, added or removed on either phone', () => {
+  const s = (f) => M.normDoc('social', { following: f });
+  same(merged(s(['a', 'b']), s(['a', 'b', 'c']), s(['b', 'd'])).following.sort(), ['b', 'c', 'd']);
+});

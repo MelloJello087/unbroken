@@ -586,7 +586,7 @@ const nativeFile=id=>`<label class="hint native">Upload not opening? <input type
 /* ---------- State ---------- */
 let S={habits:{},settings:{...DEF},social:{following:[]}}, cacheMode='local', lastT=0;
 const store={mode:'connecting',ready:false,col:null,unsub:null,why:''};
-const W={pending:new Map(),inflight:new Set(),timers:new Map(),retry:new Map()};
+const W={pending:new Map(),inflight:new Set(),timers:new Map(),retry:new Map(),base:new Map(),known:new Map()};
 const ui={tab:'mine',reorder:false,showHidden:false,sheet:null,lastFocus:null,dl:null,hadCache:false};
 const social={db:null,user:null,uid:null,can:null,blocked:false,profiles:{},pReady:false,ownKnown:new Map(),ownReady:false,streaks:{},subs:new Map(),peek:{},names:{},avatars:{},leaving:false};
 try{if(localStorage.getItem(TABKEY)==='friends')ui.tab='friends';}catch(e){}
@@ -684,6 +684,23 @@ function chainLinks(states){
   return ch.map((c,i)=>i>0&&c&&ch[i-1]);
 }
 
+/* ---------- Merging ---------- */
+const isObj=v=>!!v&&typeof v==='object'&&!Array.isArray(v), same=(a,b)=>stable(a)===stable(b);
+function merge3(b,l,r,known,k){
+  if(isObj(l)&&isObj(r)){const o={};for(const x of new Set([...Object.keys(l),...Object.keys(r)])){const v=merge3(isObj(b)?b[x]:undefined,l[x],r[x],known,k?k+'.'+x:x);if(v!==undefined)o[x]=v;}return o;}
+  if(/^log\./.test(k)){const lv=+l||0,rv=+r||0,bv=+b||0,v=!known?Math.max(lv,rv):lv===bv?rv:rv===bv?lv:rv+lv-bv;return v>0?Math.min(9999,v):undefined;}
+  if(k==='following'&&Array.isArray(l)&&Array.isArray(r)){const bs=new Set(known&&Array.isArray(b)?b:[]);return [...new Set([...r.filter(x=>l.includes(x)||!bs.has(x)),...l.filter(x=>!bs.has(x))])];}
+  if(!known)return l!==undefined?l:r;
+  return same(l,b)?r:l;
+}
+// base: the copy this device last saw from the account (null = never saved there, undefined = not known)
+function mergeDoc(base,local,remote){
+  if(local===null)return null;
+  if(remote===null)return base===undefined||base===null?local:null;
+  return merge3(base||undefined,local,remote,isObj(base),'');
+}
+const normDoc=(id,d)=>id==='settings'?normSettings(clean(d)):id==='social'?normSocial(clean(d)):clean(normHabit({...clean(d),id}));
+
 /* ---------- Text ---------- */
 function schedText(h){
   if(h.kind==='counter')return 'Running count';
@@ -769,7 +786,7 @@ function cardHTML(h,e,t,demo){
   return `<${tag} class="card${done?' is-done':''}" data-card="${h.id}" style="${hcStyle(h)}"${static_?'':` data-act="card" data-id="${h.id}" aria-label="${esc(tapLabel(h,e,meta))}"`}><span class="thumb">${vis(h)}</span><span class="txt"><span class="nm">${esc(nm)}</span><span class="meta">${esc(meta)}</span>${strip}</span>${right}</${tag}>`;
 }
 function emptyHTML(){
-  return `<div class="empty-card"><h2>No streaks yet</h2><p>Add a photo and a title, then double-tap it whenever you do it.</p><button class="btn primary" data-act="new">New streak</button>${store.mode==='connecting'&&!ui.hadCache?'<p class="hint">Looking for streaks you saved before…</p>':''}</div>`;
+  return `<div class="empty-card"><h2>${store.mode==='offline'&&!ui.hadCache?'Offline':'No streaks yet'}</h2><p>Add a photo and a title, then double-tap it whenever you do it.</p><button class="btn primary" data-act="new">New streak</button>${store.mode==='offline'&&!ui.hadCache?'<p class="hint">You\'re offline. Streaks saved to your account will show up when you reconnect.</p>':store.mode==='connecting'&&!ui.hadCache?'<p class="hint">Looking for streaks you saved before…</p>':''}</div>`;
 }
 const REMKEY='unbroken:reminded';
 const fmtTime=v=>{const [h,m]=v.split(':').map(Number);return `${h%12||12}:${pad(m)} ${h<12?'AM':'PM'}`;};
@@ -876,7 +893,9 @@ function render(){
   if(ui.tab==='friends')renderFriends(t);else renderMine(t);
   const mb=$('#btnMe');mb.hidden=!social.db;if(social.db){mb.innerHTML=avatarHTML(social.uid);resolveNames([social.uid]);}
   const note=$('#storeNote');let msg,cls='';
-  if(store.mode==='cloud'&&store.ready){msg=ACCOUNTS?'Synced to your Motif account.':'Synced to your Claude account.';cls='ok';}
+  const off=typeof navigator!=='undefined'&&navigator.onLine===false,waiting=W.pending.size+W.inflight.size;
+  if(store.mode==='offline'||(store.mode==='cloud'||store.mode==='connecting')&&off)msg="Offline. Changes are kept on this phone and sync when you're back online.";
+  else if(store.mode==='cloud'&&store.ready){if(waiting&&ui.syncWarn)msg=`${waiting} ${waiting===1?'change is':'changes are'} waiting to sync. Motif keeps trying.`;else{msg=ACCOUNTS?'Synced to your Motif account.':'Synced to your Claude account.';cls='ok';}}
   else if(store.mode!=='local') msg='Connecting to your account…';
   else msg=store.why==='readonly'?"Saved in this browser only. Your access to this page doesn't include saving to your account.":store.why==='lost'?'Saved in this browser only. The connection to your account dropped. Reload to reconnect.':'Saved in this browser only. Open this page in Claude while signed in to sync across devices.';
   note.className='foot '+cls;note.innerHTML=`<i></i><span>${esc(msg)}</span>`;
@@ -1519,11 +1538,19 @@ document.addEventListener('visibilitychange',()=>{if(!document.hidden)dayCheck()
 
 /* ---------- Saving ---------- */
 function saveLocal(){
-  try{
-    const dirty={};for(const [id,b] of W.pending)dirty[id]=b===null?0:1;
-    for(const id of W.inflight)if(!(id in dirty))dirty[id]=id==='settings'||id==='social'||S.habits[id]?1:0;
-    localStorage.setItem(KEY,JSON.stringify({v:2,mode:cacheMode,habits:S.habits,settings:S.settings,social:S.social,dirty}));
-  }catch(e){}
+  const dirty={},base={};for(const [id,b] of W.pending)dirty[id]=b===null?0:1;
+  for(const id of W.inflight)if(!(id in dirty))dirty[id]=id==='settings'||id==='social'||S.habits[id]?1:0;
+  for(const id of Object.keys(dirty))if(W.base.has(id))base[id]=W.base.get(id);
+  const o={v:2,mode:cacheMode,habits:S.habits,settings:S.settings,social:S.social,dirty,base};
+  try{localStorage.setItem(KEY,JSON.stringify(o));return full(false);}catch(e){}
+  if(cacheMode==='cloud')try{const h={};for(const [id,x] of Object.entries(S.habits))h[id]=id in dirty||!x.photo?x:{...x,photo:''};
+    for(const id of Object.keys(base))if(base[id]&&base[id].photo)base[id]={...base[id],photo:''};
+    localStorage.setItem(KEY,JSON.stringify({...o,habits:h,base,lite:1}));return full(false);}catch(e){}
+  full(true);
+}
+function full(on){
+  if(on===!!ui.full)return;ui.full=on;
+  notice(on?(cacheMode==='cloud'?"This phone is out of storage space, so changes can't be kept here if you go offline. They still save to your account while you're connected.":"This phone is out of storage space, so your latest changes can't be saved. Use Save a copy in Settings, then free up some space."):'');
 }
 function loadLocal(){
   try{
@@ -1532,28 +1559,66 @@ function loadLocal(){
     S.settings=normSettings(o.settings);S.social=normSocial(o.social);
     for(const [id,h] of Object.entries(o.habits||{}))if(SEG.test(id)&&h&&typeof h==='object')S.habits[id]=normHabit({...h,id});
     cacheMode=o.mode==='cloud'?'cloud':'local';
-    for(const [id,alive] of Object.entries(o.dirty||{}))if(SEG.test(id))W.pending.set(id,id==='settings'?{...S.settings}:id==='social'?{...S.social}:alive&&S.habits[id]?clean(S.habits[id]):null);
+    const dirty=o.dirty&&typeof o.dirty==='object'?o.dirty:{},base=o.base&&typeof o.base==='object'?o.base:{};
+    for(const [id,alive] of Object.entries(dirty))if(SEG.test(id)){
+      W.pending.set(id,id==='settings'?{...S.settings}:id==='social'?{...S.social}:alive&&S.habits[id]?clean(S.habits[id]):null);
+      if(id in base)W.base.set(id,base[id]&&typeof base[id]==='object'?normDoc(id,base[id]):null);
+    }
+    if(cacheMode==='cloud'){
+      for(const [id,h] of Object.entries(S.habits))if(!(id in dirty))W.known.set(id,clean(h));
+      for(const id of ['settings','social'])if(!(id in dirty))W.known.set(id,clean(S[id]));
+    }
     return Object.keys(S.habits).length>0;
   }catch(e){return false;}
 }
-function persist(id,body){W.pending.set(id,body);if(store.mode==='cloud'&&store.ready)schedule(id);saveLocal();}
+function persist(id,body){if(!W.base.has(id))W.base.set(id,W.known.has(id)?W.known.get(id):null);W.pending.set(id,body);if(store.mode==='cloud'&&store.ready)schedule(id);saveLocal();}
 function schedule(id,ms=350){clearTimeout(W.timers.get(id));W.timers.set(id,setTimeout(()=>{W.timers.delete(id);flush(id);},ms));}
 async function flush(id){
   if(store.mode!=='cloud'||!store.ready||W.inflight.has(id)||!W.pending.has(id))return;
-  const body=W.pending.get(id);W.pending.delete(id);W.inflight.add(id);
-  let ok=false,again=0;
-  try{const ref=store.col.doc(id);if(body===null)await ref.delete();else await ref.set(body);ok=true;W.retry.delete(id);}
+  const body=W.pending.get(id),base=W.base.has(id)?W.base.get(id):undefined;W.pending.delete(id);W.inflight.add(id);
+  let ok=false,again=0,out=body;
+  try{
+    const ref=store.col.doc(id);
+    for(let n=0;;n++){
+      const cur=typeof ref.get==='function'?await ref.get():null,remote=cur&&cur.exists?normDoc(id,cur.data()||{}):null;
+      out=cur?mergeDoc(base,body,remote):body;
+      try{
+        if(out===null){if(!cur||remote)await ref.delete();}
+        else if(!remote||!same(out,remote))await (ACCOUNTS?ref.set(out,{version:cur&&cur.exists?cur.version:null}):ref.set(out));
+        break;
+      }catch(e){if(e&&e.code==='conflict'&&n<4)continue;throw e;}
+    }
+    ok=true;W.retry.delete(id);
+  }
   catch(e){
     if(!W.pending.has(id))W.pending.set(id,body);
     const c=e&&e.code;
     if(c==='invalid_argument'||c==='transform_error'){W.inflight.delete(id);goLocal('readonly');return;}
     if(c==='revoked'||c==='not_granted'||c==='capability_disabled'||c==='capability_removed'){W.inflight.delete(id);goLocal('lost');return;}
-    if(c==='quota_exceeded')notice('Your saved data is full. Delete a streak you no longer need, then try again.');
-    else{const n=(W.retry.get(id)||0)+1;W.retry.set(id,n);if(n<=4)again=1500*n+Math.random()*1000;else notice("Some changes haven't reached your account yet. They're kept on this device and will save with your next change.");}
-  }finally{W.inflight.delete(id);saveLocal();}
+    if(c==='unauthenticated'){if(ui.reauth)ui.reauth();again=8000;}
+    else if(c==='quota_exceeded')notice('Your saved data is full. Delete a streak you no longer need, then try again.');
+    else{const n=(W.retry.get(id)||0)+1;W.retry.set(id,n);again=Math.min(30000,1500*n)+Math.random()*1000;if(n===4){ui.syncWarn=true;notice("Some changes haven't reached your account yet. They're kept on this phone, and Motif keeps trying.");render();}}
+  }finally{W.inflight.delete(id);if(ok)settle(id,body,out);saveLocal();}
+  if(ok&&ui.syncWarn&&!W.pending.size&&!W.retry.size){ui.syncWarn=false;notice('');render();}
   if(store.mode!=='cloud'||!W.pending.has(id))return;
   if(ok)schedule(id,50);else if(again)schedule(id,again);
 }
+// After a save: remember what the account now holds, and fold in anything another device added.
+function settle(id,sent,out){
+  if(out===null)W.known.delete(id);else W.known.set(id,out);
+  if(W.pending.has(id)){const next=mergeDoc(sent,W.pending.get(id),out);W.pending.set(id,next);W.base.set(id,out);if(!same(next,W.pending.get(id))||!same(sent,out))applyDoc(id,next);}
+  else{W.base.delete(id);if(!same(sent,out))applyDoc(id,out);}
+}
+function applyDoc(id,d){
+  if(id==='settings')S.settings=normSettings(d);
+  else if(id==='social'){S.social=normSocial(d);syncSubs();}
+  else if(d===null)delete S.habits[id];
+  else S.habits[id]=normHabit({...d,id});
+  render();refreshSheet();syncPublic();
+}
+function retryAll(){if(store.mode!=='cloud'||!store.ready)return;W.retry.clear();for(const id of W.pending.keys())if(!W.timers.has(id)&&!W.inflight.has(id))schedule(id,50);}
+addEventListener('online',()=>{retryAll();render();});addEventListener('offline',()=>render());
+setInterval(()=>{if(W.pending.size&&!document.hidden)retryAll();},30000);
 function goLocal(why){
   if(store.unsub){try{store.unsub();}catch(e){}store.unsub=null;}
   for(const t of W.timers.values())clearTimeout(t);W.timers.clear();
@@ -1568,9 +1633,11 @@ function onSnap(snap){
     if(doc.id==='settings')S.settings=normSettings(clean(d));
     else if(doc.id==='social')S.social=normSocial(clean(d));
     else if(SEG.test(doc.id))S.habits[doc.id]=normHabit({...clean(d),id:doc.id});
+    else continue;
+    W.known.set(doc.id,normDoc(doc.id,d));
   }
   if(definitive){
-    for(const id of Object.keys(S.habits))if(!seen.has(id)&&!W.pending.has(id)&&!W.inflight.has(id)){if(first&&cacheMode==='local')W.pending.set(id,clean(S.habits[id]));else delete S.habits[id];}
+    for(const id of Object.keys(S.habits))if(!seen.has(id)&&!W.pending.has(id)&&!W.inflight.has(id)){if(first&&cacheMode==='local')W.pending.set(id,clean(S.habits[id]));else{delete S.habits[id];W.known.delete(id);}}
     if(first&&cacheMode==='local'&&!seen.has('settings')&&!W.pending.has('settings'))W.pending.set('settings',{...S.settings});
     if(first&&cacheMode==='local'&&!seen.has('social')&&!W.pending.has('social')&&S.social.following.length)W.pending.set('social',{...S.social});
   }
@@ -1660,10 +1727,10 @@ async function connect(){
 
 /* ---------- Accounts ---------- */
 const CFG=window.UNBROKEN_CONFIG||null;
-const ACCOUNTS=!!(CFG&&CFG.supabaseUrl&&CFG.supabaseKey&&window.supabase&&!(window.claude&&window.claude.use));
+const ACCOUNTS=!!(CFG&&CFG.supabaseUrl&&CFG.supabaseKey&&!(window.claude&&window.claude.use)), ACCT='unbroken:acct';
 let sb=null,acct=null;
 const PWRULES=[['8 or more characters',p=>p.length>=8],['An uppercase letter',p=>/[A-Z]/.test(p)],['A lowercase letter',p=>/[a-z]/.test(p)],['A number',p=>/[0-9]/.test(p)],['A symbol, like ! # or ?',p=>/[!@#$%^&*()_+\-=\[\]{};'\\:"|<>?,./`~]/.test(p)]];
-const A={mode:'login',email:'',pw:'',pw2:'',show:false,busy:false,err:''};
+const A={mode:'login',email:'',pw:'',pw2:'',show:false,busy:false,err:'',info:''};
 function shimDb(uid){
   const listeners=new Set();
   const route=path=>{const p=path.split('/');
@@ -1671,7 +1738,7 @@ function shimDb(uid){
     if(p[0]==='people'&&p.length<=2)return {t:'profiles',key:'user_id',where:{},id:p[1]};
     if(p[0]==='people'&&p[2]==='streaks'&&p.length<=4)return {t:'public_streaks',key:'habit_id',where:{user_id:p[1]},id:p[3]};
     throw new TypeError('Unknown path '+path);};
-  const fail=e=>{const m=String((e&&(e.message||e.code))||'');throw {code:/permission|row-level|42501|JWT/i.test(m)?'invalid_argument':'unavailable',message:m};};
+  const fail=e=>{const m=String((e&&(e.message||e.code))||'');throw {code:/JWT|PGRST30/i.test(m)?'unauthenticated':/permission|row-level|42501/i.test(m)?'invalid_argument':'unavailable',message:m};};
   const meta={fromCache:false,hasPendingWrites:false};
   const fetchCol=async r=>{let q=sb.from(r.t).select(r.key+',body');for(const [k,v] of Object.entries(r.where))q=q.eq(k,v);const {data,error}=await q;if(error)fail(error);
     const docs=(data||[]).map(x=>({id:String(x[r.key]),exists:true,data:()=>x.body,metadata:meta}));return {docs,size:docs.length,empty:!docs.length,metadata:meta,docChanges:()=>[]};};
@@ -1684,23 +1751,75 @@ function shimDb(uid){
       return ()=>{dead=true;listeners.delete(run);clearInterval(iv);if(ch)try{sb.removeChannel(ch);}catch(e){}};}};};
   const doc=path=>{const r=route(path);
     return {path,id:r.id,
-      set:async body=>{const {error}=await sb.from(r.t).upsert({...r.where,[r.key]:r.id,body,updated_at:new Date().toISOString()});if(error)fail(error);notify();},
+      get:async()=>{let q=sb.from(r.t).select('body,updated_at').eq(r.key,r.id);for(const [k,v] of Object.entries(r.where))q=q.eq(k,v);const {data,error}=await q.maybeSingle();if(error)fail(error);
+        return {id:r.id,exists:!!data,data:()=>data?data.body:undefined,version:data?data.updated_at:null,metadata:meta};},
+      // With a version, save only if nobody changed the row since it was read; otherwise throw 'conflict' so the caller merges and tries again.
+      set:async(body,opt)=>{
+        if(!opt||!('version' in opt)){const {error}=await sb.from(r.t).upsert({...r.where,[r.key]:r.id,body,updated_at:new Date().toISOString()});if(error)fail(error);return notify();}
+        const at=new Date(Math.max(Date.now(),(Date.parse(opt.version)||0)+1)).toISOString();
+        if(opt.version==null){const {error}=await sb.from(r.t).insert({...r.where,[r.key]:r.id,body,updated_at:at});if(error){if(error.code==='23505')throw {code:'conflict'};fail(error);}return notify();}
+        let q=sb.from(r.t).update({body,updated_at:at}).eq(r.key,r.id).eq('updated_at',opt.version);for(const [k,v] of Object.entries(r.where))q=q.eq(k,v);
+        const {data,error}=await q.select(r.key);if(error)fail(error);if(!data||!data.length)throw {code:'conflict'};notify();},
       delete:async()=>{let q=sb.from(r.t).delete().eq(r.key,r.id);for(const [k,v] of Object.entries(r.where))q=q.eq(k,v);const {error}=await q;if(error)fail(error);notify();},
       collection:p=>col(path+'/'+p)};};
-  document.addEventListener('visibilitychange',()=>{if(!document.hidden)notify();});
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden)notify();});addEventListener('online',notify);
   return {doc,collection:col};
 }
+function lastAcct(){try{const a=JSON.parse(localStorage.getItem(ACCT)||'null');return a&&typeof a.id==='string'&&SEG.test(a.id)?{id:a.id,email:String(a.email||'')}:null;}catch(e){return null;}}
+// Shows this account's streaks from what the phone remembers, before (or without) reaching the server.
+function openAccount(a){
+  acct=a;KEY='unbroken:v1:'+a.id;try{localStorage.setItem(ACCT,JSON.stringify(a));}catch(e){}
+  $('#auth').hidden=true;document.body.classList.remove('locked');
+  ui.hadCache=loadLocal();render();
+}
 function useAccount(session){
-  const uid=session.user.id;acct={id:uid,email:session.user.email};
+  const uid=session.user.id;
+  if(acct&&acct.id!==uid){try{localStorage.setItem(ACCT,JSON.stringify({id:uid,email:session.user.email}));}catch(e){}return location.reload();}
+  if(!acct)openAccount({id:uid,email:session.user.email});else acct.email=session.user.email;
+  if(ui.live)return;ui.live=true;
   const blank=i=>({id:i,name:'',avatarUrl:'',color:'#888',email:null,isMe:i===uid,guest:false});
   const user={id:async()=>uid,can:async()=>true,canEdit:async()=>false,isOwner:async()=>false,profiles:async ids=>Object.fromEntries([].concat(ids).map(i=>[i,blank(i)])),
     me:async()=>({id:uid,name:'',avatarUrl:'',color:'#888',email:acct.email,isOwner:false,canEdit:false})};
   const downloads={save:async({filename,data})=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([data],{type:'application/json'}));a.download=filename;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},1000);return {status:'saved'};}};
   const db=shimDb(uid);
   window.claude={use:async n=>n==='db'?db:n==='user'?user:n==='downloads'?downloads:null};
-  KEY='unbroken:v1:'+uid;
-  $('#auth').hidden=true;document.body.classList.remove('locked');
-  ui.hadCache=loadLocal();render();connect();
+  store.mode='connecting';connect();
+}
+const netErr=e=>!!e&&(e.status===0||/fetch|network|load failed/i.test(String(e.name)+' '+String(e.message)));
+function libLoad(){
+  const old=document.querySelector('script[src*="supabase-js"]');if(!old)return Promise.resolve();
+  return new Promise(ok=>{const x=document.createElement('script');x.src=old.src;if(old.integrity)x.integrity=old.integrity;x.crossOrigin='anonymous';x.onload=x.onerror=()=>ok();document.head.appendChild(x);});
+}
+function client(){
+  if(sb||!window.supabase)return sb;
+  sb=window.supabase.createClient(CFG.supabaseUrl,CFG.supabaseKey);
+  sb.auth.onAuthStateChange(ev=>{if(ev==='SIGNED_OUT'&&!ui.leavingAcct&&acct)setTimeout(signedOut);});
+  ui.reauth=()=>{sb.auth.refreshSession().catch(()=>{});};
+  return sb;
+}
+// Keeps trying to reach the account while the phone is offline; opens it once it answers.
+let waitT=null;
+function waitOnline(){
+  if(waitT)return;
+  const go=async()=>{
+    if(ui.live){clearInterval(waitT);removeEventListener('online',go);waitT=null;return;}
+    if(!window.supabase)await libLoad();if(!client())return;
+    let r;try{r=await sb.auth.getSession();}catch(e){return;}
+    const ss=r&&r.data&&r.data.session;
+    if(!ss&&r&&netErr(r.error))return;
+    clearInterval(waitT);removeEventListener('online',go);waitT=null;
+    if(ss)useAccount(ss);else signedOut();
+  };
+  waitT=setInterval(go,15000);addEventListener('online',go);
+}
+// The login ran out on this phone: ask to log in again and keep everything saved here.
+function signedOut(){
+  if(store.unsub){try{store.unsub();}catch(e){}store.unsub=null;}
+  for(const t of W.timers.values())clearTimeout(t);W.timers.clear();
+  store.mode='offline';store.ready=false;saveLocal();render();
+  A.mode='login';A.email=acct?acct.email:A.email;A.err='';
+  A.info=W.pending.size?"You've been logged out on this phone. Log in again to sync. Your latest changes are kept here until you do.":"You've been logged out on this phone. Log in again to see your streaks.";
+  showAuth();
 }
 function authHTML(){
   const su=A.mode==='signup',p=A.pw;
@@ -1713,7 +1832,7 @@ function authHTML(){
       <div class="field"><label class="lab" for="a-pw">Password</label><div class="pw-row"><input id="a-pw" type="${A.show?'text':'password'}" autocomplete="${['current-password','new-password'][+su]}" value="${esc(A.pw)}"><button type="button" class="link" data-act="authShow">${A.show?'Hide':'Show'}</button></div>
         ${su?`<ul class="pw-rules" id="pwRules">${PWRULES.map(([l,f])=>`<li class="${f(p)?'ok':''}">${f(p)?I.check:'<i></i>'}${l}</li>`).join('')}</ul>`:''}</div>
       ${su?`<div class="field"><label class="lab" for="a-pw2">Type it again</label><input id="a-pw2" type="${A.show?'text':'password'}" autocomplete="new-password" value="${esc(A.pw2)}"></div>`:''}
-      ${A.err?`<p class="err" role="alert">${esc(A.err)}</p>`:''}
+      ${A.info&&!A.err?`<p class="hint" role="status">${esc(A.info)}</p>`:''}${A.err?`<p class="err" role="alert">${esc(A.err)}</p>`:''}
       <button class="btn primary" type="submit"${A.busy?' disabled':''}>${A.busy?'One moment…':su?'Create account':'Log in'}</button>
     </form>
   </div>`;
@@ -1740,17 +1859,19 @@ async function submitAuth(){
     const {data,error}=su?await sb.auth.signUp({email:A.email,password:A.pw}):await sb.auth.signInWithPassword({email:A.email,password:A.pw});
     if(error)throw error;
     if(!data.session)throw {message:'no session'};
-    A.pw=A.pw2='';A.busy=false;useAccount(data.session);
+    A.pw=A.pw2='';A.busy=false;A.info='';
+    if(acct){try{localStorage.setItem(ACCT,JSON.stringify({id:data.session.user.id,email:data.session.user.email}));}catch(e){}return location.reload();}
+    useAccount(data.session);
   }catch(e){A.busy=false;A.err=authError(e);showAuth();}
 }
 async function logOut(){
-  if(W.pending.size&&store.mode==='cloud'){toast('Saving your latest changes first. Try again in a moment.');for(const id of W.pending.keys())schedule(id,50);return;}
+  if(W.pending.size||W.inflight.size){if(store.mode==='cloud'&&store.ready){toast('Saving your latest changes first. Try again in a moment.');retryAll();}else toast("Some changes haven't synced yet. Reconnect first so they aren't lost.");return;}
+  ui.leavingAcct=true;
   try{await sb.auth.signOut();}catch(e){}
-  try{localStorage.removeItem(KEY);}catch(e){}
+  try{localStorage.removeItem(KEY);localStorage.removeItem(ACCT);}catch(e){}
   location.reload();
 }
 async function startAccounts(){
-  sb=window.supabase.createClient(CFG.supabaseUrl,CFG.supabaseKey);
   document.addEventListener('submit',e=>{if(e.target.id==='authForm'){e.preventDefault();submitAuth();}});
   document.addEventListener('input',e=>{const t=e.target;if(!t.closest||!t.closest('#auth'))return;
     if(t.id==='a-email')A.email=t.value;if(t.id==='a-pw2')A.pw2=t.value;
@@ -1759,8 +1880,16 @@ async function startAccounts(){
     if(b.dataset.act==='authMode'){A.mode=b.dataset.v;A.err='';showAuth();}
     if(b.dataset.act==='authShow'){A.show=!A.show;showAuth();}});
   render();
-  let session=null;try{session=(await sb.auth.getSession()).data.session;}catch(e){}
-  if(session)useAccount(session);else showAuth();
+  const last=lastAcct();
+  if(last)openAccount(last);
+  if(!client()){if(last){store.mode='offline';render();}else{A.info="Motif can't connect right now. You can log in once you're back online.";showAuth();}return waitOnline();}
+  let r=null;const slow=last?setTimeout(()=>{if(store.mode==='connecting'){store.mode='offline';render();}},6000):0;
+  try{r=await sb.auth.getSession();}catch(e){r={error:e};}clearTimeout(slow);
+  const ss=r&&r.data&&r.data.session;
+  if(ss)return useAccount(ss);
+  if(last&&netErr(r&&r.error)){store.mode='offline';render();return waitOnline();}
+  if(last)return signedOut();
+  showAuth();
 }
 
 /* ---------- Start ---------- */

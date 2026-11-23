@@ -630,3 +630,75 @@ test('weekly recap: no card later in the week', async () => {
   const { page } = await openClaude({ init: mockClaude, initArg: { seed: recapSeed() }, clock: '2026-11-18T09:00:00' });
   assert.equal(await page.$$eval('.recap-card', x => x.length), 0);
 });
+
+/* ---------- Syncing and offline ---------- */
+// Opens the app with something already remembered on this phone (as if it was used before, maybe offline).
+const withMemory = async (store, mem, o = {}) => openClaude({ ...o, init: ([m, arg, ls]) => { for (const [k, v] of Object.entries(ls)) localStorage.setItem(k, v); eval('(' + m + ')')(arg); }, initArg: [mockClaude.toString(), { seed: store }, mem] });
+const memory = (habits, o = {}) => ({ 'unbroken:v1': JSON.stringify({ v: 2, mode: 'cloud', habits, settings: { theme: 'forest', layout: 'grid' }, social: { following: [] }, dirty: {}, ...o }) });
+test('syncing: a phone that was offline with an unsent change does not erase a check-in made on another phone', async () => {
+  const s = makeSeed({ friends: false }), cloud = JSON.parse(JSON.stringify(s.seed)), h1 = cloud['data/users/u_me/h1'];
+  const base = JSON.parse(JSON.stringify(h1)), mine = { ...JSON.parse(JSON.stringify(h1)), note: 'edited offline' };
+  h1.log[s.today] = 1;   // the other phone checked in today, after this phone went offline
+  const { page, errors } = await withMemory(cloud, memory({ h1: mine }, { dirty: { h1: 1 }, base: { h1: base } }));
+  await settle(page);
+  const d = await doc(page, 'h1');
+  assert.equal(d.log[s.today], 1, "the other phone's check-in is kept"); assert.equal(d.note, 'edited offline', "this phone's change is kept");
+  assert.match(await page.textContent('.tile[data-id="h1"]'), /12/, 'the tile shows the combined streak');
+  noErrors(errors);
+});
+test('syncing: memory saved by the previous version (no record of the account\'s copy) never loses check-ins', async () => {
+  const s = makeSeed({ friends: false }), cloud = JSON.parse(JSON.stringify(s.seed)), mine = { ...JSON.parse(JSON.stringify(cloud['data/users/u_me/h1'])), note: 'old version' };
+  cloud['data/users/u_me/h1'].log[s.today] = 1;
+  const { page } = await withMemory(cloud, memory({ h1: mine }, { dirty: { h1: 1 } }));
+  await settle(page);
+  const d = await doc(page, 'h1'); assert.equal(d.log[s.today], 1); assert.equal(d.note, 'old version');
+});
+test('syncing: a streak deleted on another phone stays deleted, even with an unsent change here', async () => {
+  const s = makeSeed({ friends: false }), cloud = JSON.parse(JSON.stringify(s.seed)), base = JSON.parse(JSON.stringify(cloud['data/users/u_me/h3']));
+  delete cloud['data/users/u_me/h3'];
+  const { page, errors } = await withMemory(cloud, memory({ h3: { ...base, note: 'x' } }, { dirty: { h3: 1 }, base: { h3: base } }));
+  await settle(page);
+  assert.equal(await doc(page, 'h3'), null); assert.equal(await page.$$eval('.tile[data-id="h3"]', x => x.length), 0);
+  noErrors(errors);
+});
+test('syncing: a check-in made while the account can\'t be reached is kept, survives a reload, and saves once it can', async () => {
+  const { page, errors, today } = await open({ friends: false });
+  await page.evaluate(() => { window.__failWrites = 99; });
+  await page.dblclick('.tile[data-id="h1"] .media'); await page.waitForTimeout(400);
+  assert.equal((await doc(page, 'h1')).log[today], undefined, 'not saved to the account yet');
+  const mem = await page.evaluate(() => JSON.parse(localStorage.getItem('unbroken:v1')));
+  assert.equal(mem.habits.h1.log[today], 1, 'kept on this phone'); assert.equal(mem.dirty.h1, 1, 'marked as waiting');
+  await page.reload(); await page.evaluate(() => { window.__failWrites = 0; }); await page.waitForTimeout(2500);
+  assert.equal((await doc(page, 'h1')).log[today], 1, 'saved after the reload');
+  noErrors(errors);
+});
+test('syncing: after repeated failures the app says changes are waiting, keeps trying, and clears the message once saved', async () => {
+  const { page, errors, today } = await open({ friends: false });
+  await page.evaluate(() => { window.__failWrites = 99; });
+  await page.dblclick('.tile[data-id="h1"] .media');
+  await page.waitForFunction(() => /waiting to sync/.test(document.querySelector('#storeNote').textContent) && !document.querySelector('#notice').hidden, null, { timeout: 25000 });
+  await page.evaluate(() => { window.__failWrites = 0; });
+  await page.waitForFunction(t => (window.__store.get('data/users/u_me/h1').log || {})[t] === 1, today, { timeout: 20000 });
+  await page.waitForTimeout(300);
+  assert.equal(await page.$eval('#notice', n => n.hidden), true, 'the warning goes away');
+  assert.match(await page.textContent('#storeNote'), /Synced/);
+  noErrors(errors);
+});
+test('saving: when the phone\'s storage is full the app says so instead of failing silently', async () => {
+  const { page, errors } = await open({ friends: false });
+  await page.evaluate(() => { Storage.prototype.setItem = function () { throw new DOMException('full', 'QuotaExceededError'); }; });
+  await page.dblclick('.tile[data-id="h1"] .media'); await page.waitForTimeout(300);
+  assert.match(await page.textContent('#notice'), /out of storage space/);
+  noErrors(errors);
+});
+test('saving: when storage is nearly full, photos are left out of the phone\'s copy (they stay in the account) so changes still fit', async () => {
+  const s = makeSeed({ friends: false }), pic = 'data:image/jpeg;base64,' + 'A'.repeat(4000);
+  s.seed['data/users/u_me/h1'].photo = pic; s.seed['data/users/u_me/h1'].photoOk = true;
+  const { page } = await openClaude({ init: mockClaude, initArg: { seed: s.seed } });
+  await page.evaluate(() => { const real = Storage.prototype.setItem; Storage.prototype.setItem = function (k, v) { if (String(v).length > 3000 && /data:image/.test(v)) throw new DOMException('full', 'QuotaExceededError'); return real.call(this, k, v); }; });
+  await page.dblclick('.tile[data-id="h2"] .media'); await page.waitForTimeout(400);
+  const mem = await page.evaluate(() => JSON.parse(localStorage.getItem('unbroken:v1')));
+  assert.equal(mem.lite, 1); assert.equal(mem.habits.h1.photo, ''); assert.equal(mem.habits.h2.log[s.today], 4);
+  assert.equal(await page.$eval('#notice', n => n.hidden), true, 'no warning needed');
+  assert.equal((await doc(page, 'h1')).photo, pic, 'the photo is untouched in the account');
+});

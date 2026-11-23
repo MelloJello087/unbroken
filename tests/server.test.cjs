@@ -122,12 +122,12 @@ async function appHelpers() {
   const server = http.createServer((q, s) => { s.writeHead(200, { 'Content-Type': 'text/html' }); s.end(fs.readFileSync(dist)); }).listen(0);
   const port = await new Promise(r => server.on('listening', () => r(server.address().port)));
   servers.push(server);
-  const openApp = async () => {
+  const openApp = async ({ waitAuth = true } = {}) => {
     const b = await launch(), ctx = await b.newContext({ ...devices['iPhone 13'] });
     await ctx.route('https://cdn.jsdelivr.net/**', r => r.fulfill({ contentType: 'application/javascript', body: fs.readFileSync(path.join(lib, r.request().url().split('/').pop())) }));
     const page = await ctx.newPage(), errors = []; page.on('pageerror', e => errors.push(e.message));
-    await page.goto(`http://localhost:${port}/`); await page.waitForSelector('#auth:not([hidden])', { timeout: 20000 });
-    return { page, errors };
+    await page.goto(`http://localhost:${port}/`); if (waitAuth) await page.waitForSelector('#auth:not([hidden])', { timeout: 20000 });
+    return { page, errors, ctx };
   };
   return (helpers = { build, openApp });
 }
@@ -145,4 +145,74 @@ test('live updates: a friend sees a new profile within seconds, without reloadin
   await a.page.tap('#tabFriends'); await a.page.tap('.join [data-act="profileEdit"]'); await a.page.fill('#p-name', name); await a.page.tap('[data-act="psave"]');
   await b.page.waitForSelector(`.prow:has-text("${name}")`, { timeout: 15000 });
   assert.deepEqual([...a.errors, ...b.errors], []);
+});
+
+/* ---------- Offline and two phones ---------- */
+const HOST = () => new URL(URL_).host, TOKEN = () => 'sb-' + HOST().split('.')[0] + '-auth-token';
+const cut = ctx => ctx.route(`https://${HOST()}/**`, r => r.abort('internetdisconnected'));   // the account can't be reached
+const uncut = ctx => ctx.unroute(`https://${HOST()}/**`);
+const logOf = async who => { const r = await sql(`select d.body->'log' as log from public.user_docs d join auth.users u on u.id = d.user_id where u.email = '${email(who)}' and d.doc_id <> 'settings' and d.doc_id <> 'social'`); return r && r[0] ? r[0].log || {} : null; };
+const todayKey = () => { const n = new Date(); return n.getFullYear() + '-' + String(n.getMonth() + 1).padStart(2, '0') + '-' + String(n.getDate()).padStart(2, '0'); };
+const signUp = async (p, who) => { await p.tap('[data-act="authMode"][data-v="signup"]'); await p.fill('#a-email', email(who)); await p.fill('#a-pw', PW); await p.fill('#a-pw2', PW); await p.tap('#authForm button[type=submit]'); await p.waitForSelector('.empty-card', { timeout: 20000 }); };
+const logIn = async (p, who) => { await p.fill('#a-email', email(who)); await p.fill('#a-pw', PW); await p.tap('#authForm button[type=submit]'); };
+
+test('two phones: a check-in made offline on one phone and one made on the other both count', { skip: skip || (!REF && 'needs the management API') }, async () => {
+  const { build, openApp } = await appHelpers();
+  await build();
+  const one = await openApp(), two = await openApp();
+  await signUp(one.page, 'off');
+  await one.page.tap('.empty-card [data-act="new"]'); await one.page.tap('[data-act="ktype"][data-v="counter"]'); await one.page.fill('#f-name', 'Push-ups'); await one.page.tap('[data-act="save"]');
+  await one.page.waitForSelector('.tile'); await one.page.waitForTimeout(2500);
+  await logIn(two.page, 'off'); await two.page.waitForSelector('.tile', { timeout: 20000 });
+  await cut(one.ctx);
+  await one.page.dblclick('.tile .media'); await one.page.waitForTimeout(1500);   // offline here
+  await two.page.dblclick('.tile .media'); await two.page.waitForTimeout(2500);   // online there
+  assert.equal((await logOf('off'))[todayKey()], 1, 'only the online phone has saved so far');
+  await uncut(one.ctx); await one.page.evaluate(() => dispatchEvent(new Event('online')));
+  for (let i = 0; i < 30 && (await logOf('off'))[todayKey()] !== 2; i++) await one.page.waitForTimeout(1000);
+  assert.equal((await logOf('off'))[todayKey()], 2, 'both check-ins are in the account');
+  await two.page.reload(); await two.page.waitForSelector('.tile', { timeout: 20000 }); await two.page.waitForTimeout(1500);
+  assert.match(await two.page.textContent('.tile'), /2/);
+  assert.deepEqual([...one.errors, ...two.errors], []);
+});
+
+test('offline start: with no connection and an expired login the app shows your streaks, not the login screen, and syncs later', { skip: skip || (!REF && 'needs the management API') }, async () => {
+  const { build, openApp } = await appHelpers();
+  await build();
+  const a = await openApp();
+  await signUp(a.page, 'start');
+  await a.page.tap('.empty-card [data-act="new"]'); await a.page.tap('[data-act="ktype"][data-v="counter"]'); await a.page.fill('#f-name', 'Water'); await a.page.tap('[data-act="save"]');
+  await a.page.waitForSelector('.tile'); await a.page.waitForTimeout(2500);
+  await cut(a.ctx);
+  await a.page.evaluate(k => { const t = JSON.parse(localStorage.getItem(k)); t.expires_at = Math.floor(Date.now() / 1000) - 60; localStorage.setItem(k, JSON.stringify(t)); }, TOKEN());
+  await a.page.reload(); await a.page.waitForSelector('.tile', { timeout: 20000 });
+  assert.equal(await a.page.$eval('#auth', x => x.hidden), true, 'no login screen');
+  await a.page.waitForFunction(() => /Offline/.test(document.querySelector('#storeNote').textContent), null, { timeout: 15000 });
+  await a.page.dblclick('.tile .media'); await a.page.waitForTimeout(800);
+  await uncut(a.ctx); await a.page.evaluate(() => dispatchEvent(new Event('online')));
+  for (let i = 0; i < 30 && (await logOf('start'))[todayKey()] !== 1; i++) await a.page.waitForTimeout(1000);
+  assert.equal((await logOf('start'))[todayKey()], 1, 'the offline check-in reached the account');
+  await a.page.waitForFunction(() => /Synced/.test(document.querySelector('#storeNote').textContent), null, { timeout: 15000 });
+  assert.deepEqual(a.errors, []);
+});
+
+test('logged out: when the login is no longer valid the app asks to log in again, keeps unsent changes, and saves them after', { skip: skip || (!REF && 'needs the management API') }, async () => {
+  const { build, openApp } = await appHelpers();
+  await build();
+  const a = await openApp();
+  await signUp(a.page, 'expire');
+  await a.page.tap('.empty-card [data-act="new"]'); await a.page.tap('[data-act="ktype"][data-v="counter"]'); await a.page.fill('#f-name', 'Steps'); await a.page.tap('[data-act="save"]');
+  await a.page.waitForSelector('.tile'); await a.page.waitForTimeout(2500);
+  await cut(a.ctx); await a.page.dblclick('.tile .media'); await a.page.waitForTimeout(800);   // unsent change
+  await sql(`delete from auth.sessions where user_id = (select id from auth.users where email = '${email('expire')}')`);   // login revoked
+  await a.page.evaluate(k => { const t = JSON.parse(localStorage.getItem(k)); t.expires_at = Math.floor(Date.now() / 1000) - 60; localStorage.setItem(k, JSON.stringify(t)); }, TOKEN());
+  await uncut(a.ctx); await a.page.reload();
+  await a.page.waitForSelector('#auth:not([hidden])', { timeout: 20000 });
+  assert.match(await a.page.textContent('#auth'), /logged out on this phone/);
+  assert.equal(await a.page.inputValue('#a-email'), email('expire'), 'email filled in');
+  await a.page.fill('#a-pw', PW); await a.page.tap('#authForm button[type=submit]');
+  await a.page.waitForSelector('.tile', { timeout: 20000 });
+  for (let i = 0; i < 20 && (await logOf('expire'))[todayKey()] !== 1; i++) await a.page.waitForTimeout(1000);
+  assert.equal((await logOf('expire'))[todayKey()], 1, 'the change made before the logout was saved');
+  assert.deepEqual(a.errors, []);
 });

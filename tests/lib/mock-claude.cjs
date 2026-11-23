@@ -4,7 +4,7 @@
 module.exports = function mockClaude({ seed = {}, me = 'u_me', photoCheck = 'ok' } = {}) {
   const store = new Map(Object.entries(seed)), listeners = new Set(), writes = [];
   window.__store = store; window.__writes = writes;
-  window.__setPhotoCheck = v => { photoCheck = v; };
+  window.__setPhotoCheck = v => { photoCheck = v; }; window.__failWrites = 0;
   const meta = { fromCache: false, hasPendingWrites: false };
   const snapDoc = (p, d) => ({ id: p.split('/').pop(), exists: true, data: () => JSON.parse(JSON.stringify(d)), metadata: meta });
   const colDocs = path => { const depth = path.split('/').length + 1; return [...store.entries()].filter(([q]) => q.startsWith(path + '/') && q.split('/').length === depth).map(([q, d]) => snapDoc(q, d)); };
@@ -14,7 +14,8 @@ module.exports = function mockClaude({ seed = {}, me = 'u_me', photoCheck = 'ok'
     onSnapshot(next) { const l = () => setTimeout(() => { const docs = colDocs(path); next({ docs, size: docs.length, empty: !docs.length, metadata: meta, docChanges: () => [] }); }); listeners.add(l); l(); return () => listeners.delete(l); },
     get: async () => { const docs = colDocs(path); return { docs, size: docs.length, empty: !docs.length, metadata: meta }; } });
   const docRef = path => ({ path,
-    set: async d => { writes.push('set ' + path); if (!own(path)) throw { code: 'invalid_argument' }; store.set(path, JSON.parse(JSON.stringify(d))); notify(); },
+    get: async () => { const d = store.get(path); return { id: path.split('/').pop(), exists: d !== undefined, data: () => d === undefined ? undefined : JSON.parse(JSON.stringify(d)), metadata: meta }; },
+    set: async d => { writes.push('set ' + path); if (window.__failWrites > 0) { window.__failWrites--; throw { code: 'unavailable' }; } if (!own(path)) throw { code: 'invalid_argument' }; store.set(path, JSON.parse(JSON.stringify(d))); notify(); },
     delete: async () => { writes.push('del ' + path); if (!own(path)) throw { code: 'invalid_argument' }; store.delete(path); notify(); },
     collection: q => colRef(path + '/' + q) });
   const user = { id: async () => me, can: async () => true, profiles: async ids => Object.fromEntries([].concat(ids).map(i => [i, { id: i, name: '', avatarUrl: '' }])) };
