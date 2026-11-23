@@ -5,14 +5,18 @@ Backup of the working version before any of this: branch `backup/v1.0-before-exp
 
 ## Reliability fixes (after the audit)
 
-Stage 1, critical data reliability: **built and tested on branch `reliability-phase1`, not yet on `main` or the live pages.** Backup of the version before it: branch `backup/before-reliability-fixes`.
+Stage 1, critical data reliability: **built and tested on branch `reliability-phase1`; on the Claude test page for testing; not on `main` or the live site.** Backup of the version before it: branch `backup/before-reliability-fixes`.
 - Two phones: changes are merged instead of replaced. Check-ins are combined day by day (counts made on both phones add up), a change to one setting doesn't undo another phone's change to a different one, deleting wins, and a deleted streak never comes back. The account version only saves if nothing changed since it last read; otherwise it merges and tries again.
-- Opening the account version with no connection, or with the login library unavailable, shows the streaks this phone remembers (with an "Offline" note) instead of an empty list or the login screen, and syncs when the connection returns.
-- Unsent changes are kept on the phone through reloads and keep retrying (every 30 seconds, and as soon as the phone is back online), with a visible "waiting to sync" note after repeated failures.
+- A save that reached the account but whose answer was lost is recognised (each save carries a stamp), so nothing is counted twice, even after the app is closed and reopened.
+- Motif opens with no connection at all after one visit (offline helper `app/sw.js`). The page is always fetched fresh first, so updates show on the next open; account data is never kept by the helper.
+- Opening with no connection, or with an expired login while offline, shows the streaks this phone remembers instead of an empty list or the login screen, and syncs when the connection returns.
+- Unsent changes are kept through reloads and browser restarts and keep retrying, with a visible "waiting to sync" note after repeated failures.
 - A full phone storage is reported instead of failing silently; when space is tight, photos already safe in the account are left out of the phone's copy.
-- An expired or revoked login asks the person to log in again, keeps their unsent changes and saves them afterwards.
+- An expired or revoked login asks the person to log in again, hides the streaks behind the login screen, keeps unsent changes and saves them afterwards.
+- Found while testing and fixed: the first follow (or first settings change) after a reload could be silently undone; the streak and friends lists redrew on every refresh, which could swallow a tap.
+- Known limits: a phone still running a version from before Stage 1 saves the old way and can overwrite another phone's changes until it updates. On the Claude test page, two saves within a fraction of a second can still overwrite (the account version is protected).
 
-
+## What already exists
 
 Several requested features are partly or fully built. The plan extends them rather than duplicating them.
 
