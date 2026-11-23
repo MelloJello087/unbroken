@@ -1,6 +1,6 @@
 # Motif feature roadmap
 
-Status: **Phases 0 and 1 complete. Phase 2 waits for the owner's go-ahead.**
+Status: **Phases 0, 1 and 2 complete. Phase 3 waits for the owner's go-ahead.**
 Backup of the working version before any of this: branch `backup/v1.0-before-expansion`.
 
 ## What already exists
@@ -93,7 +93,11 @@ The original Phase 1 plan:
 
 New saved fields: `remindAt`, `remindOn` per streak; `quietFrom`, `quietTo` in settings. No database changes.
 
-### Phase 2: Tracking improvements
+### Phase 2: Tracking improvements (complete)
+
+Done, with tests (102 in total, all passing): three streak types (streak, counter, goal with daily or weekly reset), custom increments, correcting past counts on counters and goals, milestones with dates worked out from history, and the weekly recap. Earned freezes were left out by the owner's decision D1 (monthly free misses stay). No database changes.
+
+The original Phase 2 plan:
 1. **Streak types (L).** A type picker on the New streak screen: Daily streak (today's kind), Lifetime counter (no schedule, no misses, double-tap adds, minus corrects), Goal counter (target and unit, resets daily or weekly). Same cards and design language for all three. New field: `kind`, defaulting to daily.
 2. **Custom increments (S).** Each double-tap adds a chosen amount (for example +5 pages). New field: `step`, defaulting to 1.
 3. **Milestones (M).** 7, 30, 100 and 365 for daily streaks (and similar for weeks and months). A small milestone row on the streak page with dates earned, worked out from history so it can't drift out of sync. A quiet one-line celebration, no pop-ups.

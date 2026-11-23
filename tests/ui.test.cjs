@@ -536,6 +536,8 @@ test('goal (weekly): amounts add up across the week', async () => {
   for (let i = 0; i < 2; i++) { await page.dblclick(`.tile[data-id="${saved.id}"]`); await page.waitForTimeout(400); }
   await settle(page);
   assert.deepEqual(await tileOf(page, 'Push-ups').then(x => [x.big, x.small]), ['50', '/ 100 push-ups']);
+  const bar = await page.$eval(`.tile[data-id="${saved.id}"] .bar`, b => [b.getBoundingClientRect().width, b.querySelector('i').getBoundingClientRect().width]);
+  assert.ok(bar[0] > 50 && Math.abs(bar[1] / bar[0] - 0.5) < 0.02, 'the tile\'s progress bar is visible and half full: ' + bar);
   await page.tap(`.tile[data-id="${saved.id}"]`); await page.waitForTimeout(500);
   assert.match(await page.textContent('.line'), /50 push-ups to go this week/);
 });

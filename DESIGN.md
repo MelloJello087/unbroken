@@ -88,5 +88,9 @@ Control heights: `--h-sm` 36px, `--h-md` 44px (the default; every tap target is 
 - **Calendar**: rows 36px tall with 4px gaps. Done days fill with the streak color, missed days are a muted filled square with a hairline edge (the number always stays readable), rest days are dashed, and today has a single ink outline with a bold number.
 - **Sheet**: rises from the bottom with a grab handle, a title on the left, a close button on the right, and a 20px inner margin.
 - **Archived** link: a small ghost button, "Archived (n)", centered after the last streak, shown only when something is archived. It opens the Archived sheet (a grouped list with Bring back and Delete).
+- **Streak types**: one headline number each. Streaks show the streak count; counters the running total with a "+n today" badge; goals the progress ("10 / 20 pages") with a 4px progress bar in the streak color (6px on the streak page) and the streak below. List rows show a progress ring for goals and a dashed "+" circle for counters with nothing today.
+- **Milestone chips**: a row of small bordered chips on the streak page. Earned: ink number, the date, border tinted with the streak color. Next: dashed border, "n to go". Later: muted. A newly earned chip fades in once. Celebrations are one quiet message, never a pop-up.
+- **Recap card**: a bordered row at the top of the dashboard on the first two days of the week, with "See recap" and a dismiss button. The recap screen reuses the stats box, grouped lists and the chain.
+- **Selected day** (counters and goals): the calendar day being corrected gets a 2px accent ring; "Back to today" returns to today.
 - **Grouped list** (settings, people, privacy): one bordered card with hairline dividers between rows; each row is at least 52px tall.
 - **Buttons**: primary (filled accent), secondary (surface with a hairline), ghost (text only), danger. Heights 44, or 36 when small.
