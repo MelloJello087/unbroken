@@ -590,3 +590,41 @@ test("friends: a friend's counter shows its total", async () => {
   await page.tap('[data-act="follow"][data-id="u_ana"]'); await page.waitForSelector('.mini');
   assert.deepEqual(await page.$$eval('.mini', m => m.map(x => x.getAttribute('aria-label'))), ['Morning swim: 16 days, done today', 'Books: 7 books']);
 });
+
+/* ---------- Weekly recap ---------- */
+function recapSeed() {
+  const D = (a, b) => { const o = {}; for (let d = Date.UTC(2026, 10, a); d <= Date.UTC(2026, 10, b); d += 864e5) o[new Date(d).toISOString().slice(0, 10)] = 1; return o; };
+  const me = 'data/users/u_me/';
+  return {
+    [me + 'h1']: { id: 'h1', name: 'Read', icon: '📚', color: '#5f8f3e', sched: { type: 'daily' }, goal: 1, start: '2026-11-02', log: D(3, 15), skip: {}, order: 1 },
+    [me + 'h2']: { id: 'h2', name: 'Gym', icon: '💪', color: '#b5523b', sched: { type: 'weekdays', days: [1, 3, 5] }, goal: 1, start: '2026-11-02', log: { '2026-11-02': 1, '2026-11-04': 1, '2026-11-06': 1, '2026-11-09': 1, '2026-11-11': 1 }, skip: {}, order: 2 },
+    [me + 'h3']: { id: 'h3', kind: 'counter', unit: 'books', name: 'Books', icon: '📖', color: '#4f7aa3', sched: { type: 'daily' }, goal: 1, start: '2026-11-02', log: { '2026-11-03': 1, '2026-11-10': 3, '2026-11-14': 2 }, skip: {}, order: 3 },
+    [me + 'settings']: { theme: 'forest', layout: 'grid', remind: false, weekStart: 1 },
+  };
+}
+test('weekly recap: on the first day of the week a card sums up last week, and opens the recap', async () => {
+  const { page, errors } = await openClaude({ init: mockClaude, initArg: { seed: recapSeed() }, clock: '2026-11-16T09:00:00' });
+  assert.equal(await page.textContent('.recap-t span'), '90% done · 11 check-ins · 1 milestone');
+  await page.tap('.recap-card [data-act="recap"]'); await page.waitForTimeout(500);
+  const stats = await page.$$eval('.recap-stats > div', x => x.map(d => [...d.children].map(c => c.textContent)));
+  assert.deepEqual(stats, [['Completion', '90%', 'same as the week before'], ['Check-ins', '11', '+1 on the week before'], ['Total counted', '14', '+4 on the week before'], ['Longest streak', '13 days', 'Read']]);
+  assert.match(await page.textContent('#sheetBody'), /Read7 days · Nov 9/);
+  assert.deepEqual(await page.$$eval('.recap-n', x => x.map(n => n.textContent)), ['7 of 7', '2 of 3', '+5']);
+  assert.equal(await page.evaluate(() => window.__store.get('data/users/u_me/settings').recapSeen), '2026-11-09', 'opening it marks this week\'s card as seen');
+  await page.tap('[data-act="recapNav"][data-d="-7"]');
+  assert.match(await page.textContent('#sheetBody h3'), /Week of Nov 2/);
+  await page.tap('.sh-head [data-act="close"]'); await page.waitForTimeout(300);
+  assert.equal(await page.$$eval('.recap-card', x => x.length), 0);
+  noErrors(errors);
+});
+test('weekly recap: the card can be dismissed, and the recap is always in Settings', async () => {
+  const { page } = await openClaude({ init: mockClaude, initArg: { seed: recapSeed() }, clock: '2026-11-16T09:00:00' });
+  await page.tap('.recap-card [data-act="recapSeen"]'); await page.waitForTimeout(400);
+  assert.equal(await page.$$eval('.recap-card', x => x.length), 0);
+  await page.tap('#btnSettings'); await page.tap('[data-act="recap"]'); await page.waitForTimeout(400);
+  assert.match(await page.textContent('#sheetBody h3'), /Week of Nov 9/);
+});
+test('weekly recap: no card later in the week', async () => {
+  const { page } = await openClaude({ init: mockClaude, initArg: { seed: recapSeed() }, clock: '2026-11-18T09:00:00' });
+  assert.equal(await page.$$eval('.recap-card', x => x.length), 0);
+});

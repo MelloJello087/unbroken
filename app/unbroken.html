@@ -163,6 +163,13 @@ body.dragging{-webkit-user-select:none;user-select:none;cursor:grabbing}
 .mile.on b{color:var(--ink)}.mile.on small{color:var(--ink-2)}
 .mile.next{border-style:dashed}.mile.next b{color:var(--ink-2)}
 .mile.new{animation:checkin .4s var(--ease)}
+.recap-card{display:flex;align-items:center;gap:var(--s2);padding:var(--s2) var(--s2) var(--s2) var(--s4);margin-bottom:var(--s3);border:1px solid var(--line);border-radius:var(--r-md);background:var(--surface)}
+.recap-t{display:flex;flex-direction:column;flex:1;min-width:0}
+.recap-t b{font:var(--t-md);font-weight:600}
+.recap-t span{font:var(--t-sm);color:var(--ink-2)}
+.recap-stats small{font:var(--t-xs);font-weight:400;color:var(--ink-2)}
+.recap-n{font:600 15px/1 var(--f-display);font-variant-numeric:tabular-nums;color:var(--ink-2);flex:none}
+.srow .sl .strip{margin-top:var(--s1)}
 .hidden-note{font:var(--t-sm);color:var(--ink-2);text-align:center;margin-top:var(--s3)}
 .link{background:none;border:none;padding:var(--s1);font:var(--t-sm);font-weight:600;color:var(--accent);cursor:pointer;text-decoration:underline;text-underline-offset:3px}
 
@@ -485,7 +492,7 @@ const ICONS=['📚','💧','🏃','🧘','💪','🥗','😴','✍️','🎸','�
 const PRESETS=[['📚','#5f8f3e'],['💧','#3c8d8a'],['🏃','#cf7a3a'],['🧘','#7c6aa3'],['💪','#b5523b'],['🥗','#8aa83a'],['😴','#4f7aa3'],['🎸','#b25a7a'],['🌱','#2f7d5b'],['✍️','#a39a35'],['🧠','#c9a227'],['🚶','#8c5a3c']];
 const AVATARS=[['🌲','#2f7d5b'],['🦊','#cf7a3a'],['🐻','#8c5a3c'],['🌻','#c9a227'],['🍄','#b5523b'],['🦉','#7c6aa3'],['🐢','#5f8f3e'],['🌙','#4f7aa3'],['⛰️','#3c8d8a'],['🌊','#1d6b7c'],['🔥','#a24c2e'],['🐝','#a39a35']];
 const SCHED=[['daily','Every day'],['weekdays','Certain days'],['interval','Every few days'],['perWeek','Times a week'],['perMonth','Times a month']];
-const DEF={remind:true,remindAt:'07:00',quiet:false,quietFrom:'22:00',quietTo:'07:00',theme:'forest',weekStart:1,rollover:0,layout:'grid',sort:'manual',groups:true,hideDone:false,celebrate:true};
+const DEF={recapSeen:'',remind:true,remindAt:'07:00',quiet:false,quietFrom:'22:00',quietTo:'07:00',theme:'forest',weekStart:1,rollover:0,layout:'grid',sort:'manual',groups:true,hideDone:false,celebrate:true};
 const MILESTONES={day:[7,30,100,365],week:[4,12,26,52],month:[3,6,12,24],count:[10,50,100,250,500,1000]};
 const KINDS=['streak','counter','goal'];
 const HHMM=/^([01]\d|2[0-3]):[0-5]\d$/,HEX=/^#[0-9a-f]{6}$/i, DATE=/^\d{4}-\d\d-\d\d$/, SEG=/^[A-Za-z0-9_\-.~:@+]{1,64}$/, IMG=/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/;
@@ -592,6 +599,7 @@ function normSettings(o){
   if(Number.isInteger(o.rollover)&&o.rollover>=0&&o.rollover<=5) s.rollover=o.rollover;
   if(['grid','list','compact'].includes(o.layout)) s.layout=o.layout; else if(o.density==='compact') s.layout='compact';
   if(['manual','streak','name','due'].includes(o.sort)) s.sort=o.sort;
+  if(typeof o.recapSeen==='string'&&(o.recapSeen===''||DATE.test(o.recapSeen))) s.recapSeen=o.recapSeen;
   for(const k of ['remindAt','quietFrom','quietTo']) if(typeof o[k]==='string'&&HHMM.test(o[k])) s[k]=o[k];
   for(const k of ['groups','hideDone','celebrate','remind','quiet']) if(typeof o[k]==='boolean') s[k]=o[k];
   return s;
@@ -800,7 +808,7 @@ function renderMine(t){
     const doneNow=h=>{const e=evs.get(h.id);return e.doneToday||!!(e.period&&e.period.target&&e.period.count>=e.period.target);};
     if(S.settings.hideDone&&!ui.reorder&&!ui.showHidden){const b=arr.length;arr=arr.filter(h=>!doneNow(h));hidden=b-arr.length;}
     const grid=S.settings.layout==='grid'&&!ui.reorder;
-    let html=ui.reorder?'':reminderHTML(active,evs,t);
+    let html=ui.reorder?'':recapCardHTML(t)+reminderHTML(active,evs,t);
     html+=ui.reorder?`<div class="reorder-bar"><span>Use the arrows to change the order.</span><button class="btn sm primary" data-act="reorder">Done</button></div>`:'';
     html+=groupList(arr).map(([g,hs])=>`<section class="group">${g?`<h2 class="grp">${esc(g)}</h2>`:''}<div class="${grid?'grid':'cards'}">${hs.map(h=>grid?tileHTML(h,evs.get(h.id),t):cardHTML(h,evs.get(h.id),t)).join('')}</div></section>`).join('');
     const na=Object.values(S.habits).filter(h=>h.archived).length;
@@ -931,6 +939,48 @@ function detailHTML(h,ro,pid){
     ${visLine}
     ${ro?'':ui.sheet.confirmDel?`<div class="danger" role="alert"><p>Delete ${esc(nm)} and its ${Object.keys(h.log).length} ${Object.keys(h.log).length===1?'check-in':'check-ins'}?${social.profiles[social.uid]&&!h.hidden?' Friends will stop seeing it too.':''}</p><div class="row"><button class="btn danger" data-act="ddelyes" data-id="${h.id}">Delete streak</button><button class="btn ghost" data-act="ddelno">Keep it</button></div></div>`
       :`<div class="actions"><button class="btn" data-act="edit" data-id="${h.id}">Edit streak</button><button class="btn ghost" data-act="archive" data-id="${h.id}">Archive</button><button class="btn ghost danger-text" data-act="ddel">Delete</button></div>`}
+  </div>`;
+}
+/* ---------- Weekly recap ---------- */
+function weekStats(ws){
+  const we=ws+6,t=today(),end=Math.min(we,t),r={ws,we,hit:0,exp:0,checkins:0,sum:0,longest:null,miles:[],rows:[]};
+  for(const h of Object.values(S.habits)){
+    if(h.archived||dnOf(h.start)>we)continue;
+    const e=evaluate(h,end);let hit=0,exp=0;
+    for(let d=ws;d<=end;d++){const k=keyOf(d),n=h.log[k]||0,st=e.st.get(d);r.sum+=n;
+      if(e.kind==='counter'){if(n)r.checkins++;continue;}
+      if(st==='done')r.checkins++;
+      if(e.period)continue;
+      const sched=h.kind==='goal'||h.sched.type!=='weekdays'||h.sched.days.includes(dow(d));
+      if(st==='done'&&sched){hit++;exp++;}else if(st==='missed'||st==='frozen')exp++;}
+    if(e.period&&e.kind!=='counter'&&e.period.target){exp=1;hit=e.period.count>=e.period.target?1:0;if(end<we&&!hit)exp=0;}
+    r.hit+=hit;r.exp+=exp;
+    if(e.kind!=='counter'&&e.cur&&(!r.longest||e.cur>r.longest.cur))r.longest={h,cur:e.cur,unit:e.unit};
+    for(const [m,d] of Object.entries(e.miles))if(d>=ws&&d<=we)r.miles.push({h,e,m:+m,d});
+    r.rows.push({h,e,hit,exp,end});
+  }
+  r.rows.sort((a,b)=>a.h.order-b.h.order);
+  r.pct=r.exp?Math.round(r.hit/r.exp*100):null;
+  return r;
+}
+const vs=(a,b,unit='')=>a==null||b==null?'':a===b?'same as the week before':`${a>b?'+':'−'}${Math.abs(a-b)}${unit} on the week before`;
+function recapCardHTML(t){
+  const ws=weekStartOf(t);if(t-ws>1)return '';
+  const last=ws-7;if(S.settings.recapSeen===keyOf(last))return '';
+  const r=weekStats(last);if(!r.checkins&&!r.sum)return '';
+  return `<div class="recap-card"><div class="recap-t"><b>Your week</b><span>${r.pct!=null?`${r.pct}% done · `:''}${r.checkins} ${r.checkins===1?'check-in':'check-ins'}${r.miles.length?` · ${r.miles.length} ${r.miles.length===1?'milestone':'milestones'}`:''}</span></div><button type="button" class="btn sm" data-act="recap" data-d="${last}">See recap</button><button type="button" class="icon-btn sm" data-act="recapSeen" data-d="${last}" aria-label="Dismiss">${I.x}</button></div>`;
+}
+function recapHTML(){
+  const sh=ui.sheet,t=today(),r=weekStats(sh.ws),p=weekStats(sh.ws-7),cur=sh.ws===weekStartOf(t);
+  const title=cur?'This week so far':`Week of ${fmt(sh.ws)}`;
+  const stats=[['Completion',r.pct==null?'–':r.pct+'%',vs(r.pct,p.pct,' pts')],['Check-ins',String(r.checkins),vs(r.checkins,p.checkins)],['Total counted',String(r.sum),vs(r.sum,p.sum)],
+    ['Longest streak',r.longest?`${r.longest.cur} ${uw(r.longest.unit,r.longest.cur)}`:'–',r.longest?nameOf(r.longest.h):'']];
+  return `<div class="sh-head"><h2>Weekly recap</h2><button class="icon-btn" data-act="close" aria-label="Close">${I.x}</button></div>
+  <div class="detail">
+    <div class="cal-head"><button class="icon-btn sm" data-act="recapNav" data-d="-7" aria-label="Week before">${I.left}</button><h3>${esc(title)}<small>${esc(fmt(sh.ws))} – ${esc(fmt(sh.ws+6))}</small></h3><button class="icon-btn sm" data-act="recapNav" data-d="7" aria-label="Week after"${cur?' disabled':''}>${I.right}</button></div>
+    <div class="stats recap-stats">${stats.map(([a,b,c])=>`<div><span>${esc(a)}</span><b>${esc(b)}</b>${c?`<small>${esc(c)}</small>`:''}</div>`).join('')}</div>
+    ${r.miles.length?`<div class="field"><span class="lab">Milestones</span><div class="set">${r.miles.map(x=>`<div class="srow" style="--hc:${x.h.color}"><span class="arow"><span class="ico-sm">${x.h.photo?`<img src="${esc(x.h.photo)}" alt="">`:esc(x.h.icon)}</span><span class="sl">${esc(nameOf(x.h))}<small>${x.m} ${esc(countLabel(x.h,x.e,x.m))} · ${esc(fmt(x.d))}</small></span></span></div>`).join('')}</div></div>`:''}
+    <div class="field"><span class="lab">Streaks</span>${r.rows.length?`<div class="set">${r.rows.map(x=>`<div class="srow" style="${hcStyle(x.h)}"><span class="arow"><span class="ico-sm">${x.h.photo?`<img src="${esc(x.h.photo)}" alt="">`:esc(x.h.icon)}</span><span class="sl">${esc(nameOf(x.h))}${stripHTML(x.h,x.e,x.end,true)}</span></span><span class="recap-n">${x.e.kind==='counter'?esc(`+${Object.entries(x.h.log).filter(([k])=>dnOf(k)>=sh.ws&&dnOf(k)<=sh.ws+6).reduce((a,[,v])=>a+v,0)}`):x.exp?`${x.hit} of ${x.exp}`:'–'}</span></div>`).join('')}</div>`:'<p class="muted-note">No streaks that week.</p>'}</div>
   </div>`;
 }
 function milestonesHTML(h,e,t){
@@ -1078,6 +1128,7 @@ function settingsHTML(){
       <div class="srow"><label class="sl" for="s-roll">New day starts at<small>For night owls. A check-in before this time counts for the day before.</small></label><select id="s-roll">${[0,1,2,3,4,5].map(x=>`<option value="${x}"${s.rollover===x?' selected':''}>${x?x+':00 AM':'Midnight'}</option>`).join('')}</select></div>
     </div></section>
     <section><h3>Home screen</h3><div class="set">
+      <div class="srow"><span class="sl">Weekly recap<small>How last week went, compared with the week before.</small></span><button type="button" class="btn sm" data-act="recap">Open</button></div>
       <div class="srow"><label class="sl" for="s-sort">Sort streaks</label><select id="s-sort">${[['manual','My order'],['due','Still to do first'],['streak','Longest streak'],['name','Title']].map(([v,l])=>`<option value="${v}"${s.sort===v?' selected':''}>${l}</option>`).join('')}</select></div>
       ${Object.values(S.habits).filter(h=>!h.archived).length>1?'<div class="srow"><span class="sl">Order of streaks</span><button type="button" class="btn sm" data-act="reorderStart">Change order</button></div>':''}
       ${tg('groups','Show groups','Streaks with the same group sit together.')}
@@ -1112,6 +1163,7 @@ function renderSheet(fresh){
   else if(sh.kind==='person'){b.innerHTML=personHTML(sh.id);sheet.setAttribute('aria-label',displayName(sh.id));}
   else if(sh.kind==='edit'){b.innerHTML=editorHTML();sheet.setAttribute('aria-label',sh.isNew?'New streak':'Edit streak');}
   else if(sh.kind==='profile'){b.innerHTML=profileHTML();sheet.setAttribute('aria-label','Your profile');}
+  else if(sh.kind==='recap'){b.innerHTML=recapHTML();sheet.setAttribute('aria-label','Weekly recap');}
   else if(sh.kind==='archived'){b.innerHTML=archivedHTML();sheet.setAttribute('aria-label','Archived');}
   else{b.innerHTML=settingsHTML();sheet.setAttribute('aria-label','Settings');}
   b.scrollTop=y;
@@ -1339,6 +1391,9 @@ document.addEventListener('click',e=>{
     case 'new':return openSheet({kind:'edit',isNew:true,draft:newHabit()});
     case 'settings':return openSheet({kind:'settings'});
     case 'archived':return openSheet({kind:'archived'});
+    case 'recap':{const w=b.dataset.d!=null?+b.dataset.d:weekStartOf(today())-7;if(S.settings.recapSeen!==keyOf(w)&&w===weekStartOf(today())-7)setSetting('recapSeen',keyOf(w));return openSheet({kind:'recap',ws:w});}
+    case 'recapSeen':return setSetting('recapSeen',keyOf(+b.dataset.d));
+    case 'recapNav':sh.ws+=+b.dataset.d;return renderSheet();
     case 'reorder':ui.reorder=!ui.reorder;return render();
     case 'up':return move(id,-1);
     case 'down':return move(id,1);

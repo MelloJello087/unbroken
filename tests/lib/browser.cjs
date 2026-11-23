@@ -12,13 +12,14 @@ async function launch() {
 }
 async function close() { if (browser) await browser.close(); browser = null; }
 // Opens the app as on the Claude test page. `init` runs before the app (for the mock); returns { page, errors }.
-async function openClaude({ device = 'iPhone 13', init, initArg, html = claudePage() } = {}) {
+async function openClaude({ device = 'iPhone 13', init, initArg, html = claudePage(), clock } = {}) {
   const b = await launch();
   const ctx = await b.newContext({ ...devices[device] });
   if (init) await ctx.addInitScript(init, initArg);
   await ctx.route('http://app.test/', r => r.fulfill({ contentType: 'text/html', body: html }));
   const page = await ctx.newPage(), errors = [];
   page.on('pageerror', e => errors.push(e.message));
+  if (clock) await page.clock.setFixedTime(new Date(clock));   // pretend it is this date and time
   await page.goto('http://app.test/');
   await page.waitForTimeout(700);
   return { page, ctx, errors };
