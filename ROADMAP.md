@@ -14,7 +14,21 @@ Stage 1, critical data reliability: **built and tested on branch `reliability-ph
 - A full phone storage is reported instead of failing silently; when space is tight, photos already safe in the account are left out of the phone's copy.
 - An expired or revoked login asks the person to log in again, hides the streaks behind the login screen, keeps unsent changes and saves them afterwards.
 - Found while testing and fixed: the first follow (or first settings change) after a reload could be silently undone; the streak and friends lists redrew on every refresh, which could swallow a tap.
-- Known limits: a phone still running a version from before Stage 1 saves the old way and can overwrite another phone's changes until it updates. On the Claude test page, two saves within a fraction of a second can still overwrite (the account version is protected).
+- Save receipts (database migration 0004, applied; undo script in `supabase/rollback/`): the database records each save's stamp in the same step as the save and refuses a stamp it has seen, so one save is applied once. After a lost answer, the app asks the database whether its save landed, even if another phone has saved over it since. People can read only their own receipts; only the database writes them. Receipts are kept 60 days.
+- Version gate (same migration, switched off): saves carry the app version (`APP`, 2 for Stage 1). The database refuses saves below a minimum kept in `private.config` (`min_app` for everyone, `min_app:<user id>` for one account). It starts at 0, which refuses nothing. When it refuses this version, the app says to reload and keeps the changes on the phone.
+
+#### Version gate: rollout and rollback
+1. Now: off (`min_app` = 0). Every version saves as before.
+2. After Stage 1 goes live, check that older versions have stopped saving. This counts streaks saved in the last 14 days by a version without a version number (it should reach 0):
+   `select count(*) from public.user_docs where updated_at > now() - interval '14 days' and not (body ? 'app');`
+3. Try it on your own account first: `insert into private.config (k, v) values ('min_app:<your user id>', '2');` Use Motif on your phone and computer for a day.
+4. Turn it on for everyone: `update private.config set v = '2' where k = 'min_app';`
+5. Undo at once if anything looks wrong: `update private.config set v = '0' where k = 'min_app';` (and delete any `min_app:` rows). Nothing is lost: refused changes wait on each phone and save when allowed. To remove receipts and the gate entirely, run `supabase/rollback/0004_save_receipts.sql`; saved streaks are not touched.
+6. Future releases that change how saving works: raise `APP`, release, then repeat steps 2 to 5 with the new number.
+
+What the gate does not cover: deleting a streak (an explicit choice, allowed from any version); profiles and the copies of streaks shown to friends (rebuilt from private data by current versions); the Claude test page (no database rules there). It is a guard against outdated versions of Motif, not a security barrier: someone writing requests by hand can claim any version, but the privacy rules still limit them to their own data.
+
+- Known limits: until the version gate is turned on, a phone still running a version from before Stage 1 saves the old way and can overwrite another phone's changes. On the Claude test page, two saves within a fraction of a second can still overwrite, and there are no receipts (the account version is protected).
 
 ## What already exists
 

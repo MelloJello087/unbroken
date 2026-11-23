@@ -485,6 +485,8 @@ body.locked .toast{bottom:calc(var(--s4) + env(safe-area-inset-bottom,0px))}
 'use strict';
 /* ---------- Constants ---------- */
 let KEY='unbroken:v1';
+// Sent with every save; raise it when a release changes how saving works (see ROADMAP.md, version gate).
+const APP=2;
 const TABKEY='unbroken:tab', DAY=864e5;
 const DN=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'], DNL=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'], DL=['S','M','T','W','T','F','S'];
 const MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'], MONL=['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -897,7 +899,8 @@ function render(){
   const mb=$('#btnMe');mb.hidden=!social.db;if(social.db){mb.innerHTML=avatarHTML(social.uid);resolveNames([social.uid]);}
   const note=$('#storeNote');let msg,cls='';
   const off=typeof navigator!=='undefined'&&navigator.onLine===false,waiting=W.pending.size+W.inflight.size;
-  if(store.mode==='offline'||(store.mode==='cloud'||store.mode==='connecting')&&off)msg="Offline. Changes are kept on this phone and sync when you're back online.";
+  if(ui.outdated)msg='Motif has been updated. Reload to keep syncing.';
+  else if(store.mode==='offline'||(store.mode==='cloud'||store.mode==='connecting')&&off)msg="Offline. Changes are kept on this phone and sync when you're back online.";
   else if(store.mode==='cloud'&&store.ready){if(waiting&&ui.syncWarn)msg=`${waiting} ${waiting===1?'change is':'changes are'} waiting to sync. Motif keeps trying.`;else{msg=ACCOUNTS?'Synced to your Motif account.':'Synced to your Claude account.';cls='ok';}}
   else if(store.mode!=='local') msg='Connecting to your account…';
   else msg=store.why==='readonly'?"Saved in this browser only. Your access to this page doesn't include saving to your account.":store.why==='lost'?'Saved in this browser only. The connection to your account dropped. Reload to reconnect.':'Saved in this browser only. Open this page in Claude while signed in to sync across devices.';
@@ -1566,7 +1569,7 @@ function loadLocal(){
     for(const [id,alive] of Object.entries(dirty))if(SEG.test(id)){
       W.pending.set(id,id==='settings'?{...S.settings}:id==='social'?{...S.social}:alive&&S.habits[id]?clean(S.habits[id]):null);
       if(id in base)W.base.set(id,base[id]&&typeof base[id]==='object'?normDoc(id,base[id]):null);
-      const t=tries[id];if(t&&typeof t.rev==='string'&&(t.sent===null||isObj(t.sent)))W.tries.set(id,{rev:t.rev,sent:t.sent&&normDoc(id,t.sent)});
+      const ts=(Array.isArray(tries[id])?tries[id]:[tries[id]]).filter(t=>t&&typeof t.rev==='string'&&(t.sent===null||isObj(t.sent))).map(t=>({rev:t.rev,sent:t.sent&&normDoc(id,t.sent),...(isObj(t.out)?{out:normDoc(id,t.out)}:{}),...(typeof t.ver==='string'||t.ver===null?{ver:t.ver}:{})}));if(ts.length)W.tries.set(id,ts);
     }
     // Only what the account was seen to hold counts as known; settings and the follow list may never have been saved there.
     if(cacheMode==='cloud'){const srv=Array.isArray(o.srv)?new Set(o.srv):null;
@@ -1585,15 +1588,20 @@ async function flush(id){
   try{
     const ref=store.col.doc(id);
     for(let n=0;;n++){
-      const cur=typeof ref.get==='function'?await ref.get():null,raw=cur&&cur.exists?cur.data()||{}:null,remote=raw?normDoc(id,raw):null,t=W.tries.get(id);
-      // An earlier save reached the account but its answer was lost: count it as done, so nothing is added twice.
-      if(t&&raw&&raw.rev===t.rev){W.tries.delete(id);body=mergeDoc(t.sent,body,remote);base=remote;W.base.set(id,remote);}
+      const cur=typeof ref.get==='function'?await ref.get():null,raw=cur&&cur.exists?cur.data()||{}:null,remote=raw?normDoc(id,raw):null,ver=cur&&cur.exists?cur.version:null;
+      // Earlier saves whose answer was lost: if one reached the account (its stamp is there, or the account's receipt says so,
+      // even after another phone saved over it), count it as done so nothing is added twice. One that can no longer land is dropped.
+      let ts=W.tries.get(id)||[],hit=null;
+      for(const t of [...ts].reverse()){if(raw&&raw.rev===t.rev){hit=[t,remote];break;}if(t.out!==undefined&&typeof ref.landed==='function'&&await ref.landed(t.rev)){hit=[t,t.out];break;}}
+      if(hit){ts=[];body=mergeDoc(hit[0].sent,body,hit[1]);base=hit[1];W.base.set(id,base);}
+      else if(typeof ref.landed==='function')ts=ts.filter(t=>t.ver!==undefined&&t.ver===ver);
+      if(ts.length)W.tries.set(id,ts);else W.tries.delete(id);
       out=!cur?body:remote===null&&(id==='settings'||id==='social')?body:mergeDoc(base,body,remote);
       try{
         if(out===null){if(!cur||remote)await ref.delete();}
         else if(!remote||!same(out,remote)){
-          const rev=Math.random().toString(36).slice(2,9)+Date.now().toString(36);W.tries.set(id,{rev,sent:body});saveLocal();
-          await (ACCOUNTS?ref.set({...out,rev},{version:cur&&cur.exists?cur.version:null}):ref.set({...out,rev}));
+          const rev=Math.random().toString(36).slice(2,9)+Date.now().toString(36);W.tries.set(id,[...(W.tries.get(id)||[]).slice(-4),{rev,sent:body,out,ver}]);saveLocal();
+          await (ACCOUNTS?ref.set({...out,rev,app:APP},{version:cur&&cur.exists?cur.version:null}):ref.set({...out,rev,app:APP}));
         }
         W.tries.delete(id);break;
       }catch(e){if(e&&e.code==='conflict'&&n<4)continue;throw e;}
@@ -1606,6 +1614,7 @@ async function flush(id){
     if(c==='invalid_argument'||c==='transform_error'){W.inflight.delete(id);goLocal('readonly');return;}
     if(c==='revoked'||c==='not_granted'||c==='capability_disabled'||c==='capability_removed'){W.inflight.delete(id);goLocal('lost');return;}
     if(c==='unauthenticated'){if(ui.reauth)ui.reauth();again=8000;}
+    else if(c==='outdated'){again=60000;if(!ui.outdated){ui.outdated=true;notice("Motif has been updated. Reload the page to keep syncing. Your changes are kept on this phone until then.");render();}}
     else if(c==='quota_exceeded')notice('Your saved data is full. Delete a streak you no longer need, then try again.');
     else{const n=(W.retry.get(id)||0)+1;W.retry.set(id,n);again=Math.min(30000,1500*n)+Math.random()*1000;if(n===4){ui.syncWarn=true;notice("Some changes haven't reached your account yet. They're kept on this phone, and Motif keeps trying.");render();}}
   }finally{W.inflight.delete(id);if(ok)settle(id,body,out);saveLocal();}
@@ -1748,7 +1757,7 @@ function shimDb(uid){
     if(p[0]==='people'&&p.length<=2)return {t:'profiles',key:'user_id',where:{},id:p[1]};
     if(p[0]==='people'&&p[2]==='streaks'&&p.length<=4)return {t:'public_streaks',key:'habit_id',where:{user_id:p[1]},id:p[3]};
     throw new TypeError('Unknown path '+path);};
-  const fail=e=>{const m=String((e&&(e.message||e.code))||'');throw {code:/JWT|PGRST30/i.test(m)?'unauthenticated':/permission|row-level|42501/i.test(m)?'invalid_argument':'unavailable',message:m};};
+  const fail=e=>{const m=String((e&&(e.message||e.code))||'');throw {code:/motif_outdated/.test(m)?'outdated':e&&e.code==='23505'?'conflict':/JWT|PGRST30/i.test(m)?'unauthenticated':/permission|row-level|42501/i.test(m)?'invalid_argument':'unavailable',message:m};};
   const meta={fromCache:false,hasPendingWrites:false};
   const fetchCol=async r=>{let q=sb.from(r.t).select(r.key+',body');for(const [k,v] of Object.entries(r.where))q=q.eq(k,v);const {data,error}=await q;if(error)fail(error);
     const docs=(data||[]).map(x=>({id:String(x[r.key]),exists:true,data:()=>x.body,metadata:meta}));return {docs,size:docs.length,empty:!docs.length,metadata:meta,docChanges:()=>[]};};
@@ -1761,6 +1770,7 @@ function shimDb(uid){
       return ()=>{dead=true;listeners.delete(run);clearInterval(iv);if(ch)try{sb.removeChannel(ch);}catch(e){}};}};};
   const doc=path=>{const r=route(path);
     return {path,id:r.id,
+      landed:async rev=>{if(r.t!=='user_docs')return false;const {data,error}=await sb.from('save_receipts').select('rev').eq('rev',rev).maybeSingle();if(error)fail(error);return !!data;},
       get:async()=>{let q=sb.from(r.t).select('body,updated_at').eq(r.key,r.id);for(const [k,v] of Object.entries(r.where))q=q.eq(k,v);const {data,error}=await q.maybeSingle();if(error)fail(error);
         return {id:r.id,exists:!!data,data:()=>data?data.body:undefined,version:data?data.updated_at:null,metadata:meta};},
       // With a version, save only if nobody changed the row since it was read; otherwise throw 'conflict' so the caller merges and tries again.

@@ -23,7 +23,7 @@ async function sql(query) {
 }
 async function cleanup() {
   if (!REF) return;
-  await sql(`delete from auth.users where email like '${RUN}-%@example.com'; delete from private.signup_networks where first_signup >= '${STARTED}';`);
+  await sql(`delete from private.config where k in (select 'min_app:' || id from auth.users where email like '${RUN}-%@example.com'); delete from auth.users where email like '${RUN}-%@example.com'; delete from private.signup_networks where first_signup >= '${STARTED}';`);
 }
 const servers = [];
 test.after(async () => { await cleanup(); servers.forEach(x => x.close()); try { await require('./lib/browser.cjs').close(); } catch (e) {} });
@@ -116,7 +116,7 @@ test('syncing: friends see public streaks, and a streak made private disappears 
   assert.deepEqual([...a.errors, ...b.errors], []);
 });
 
-let helpers;
+let helpers, oldHtml = null;
 async function appHelpers() {
   if (helpers) return helpers;
   const { launch, devices, ROOT } = require('./lib/browser.cjs');
@@ -133,15 +133,16 @@ async function appHelpers() {
   const server = http.createServer((q, s) => {
     const p = q.url.split('?')[0], f = p === '/sw.js' ? path.join(ROOT, 'dist/sw.js') : p === '/' ? dist : null;
     if (!f) { s.writeHead(404); return s.end(); }
+    if (p === '/' && /[?&]v=old/.test(q.url) && oldHtml) { s.writeHead(200, { 'Content-Type': 'text/html' }); return s.end(oldHtml); }   // the previous version, kept through reloads
     s.writeHead(200, { 'Content-Type': f.endsWith('.js') ? 'text/javascript' : 'text/html', 'Cache-Control': 'max-age=600' }); s.end(fs.readFileSync(f));
   }).listen(0);
   const port = await new Promise(r => server.on('listening', () => r(server.address().port)));
   servers.push(server);
-  const openApp = async ({ waitAuth = true, storageState } = {}) => {
+  const openApp = async ({ waitAuth = true, storageState, at = '/' } = {}) => {
     const b = await launch(), ctx = await b.newContext({ ...devices['iPhone 13'], ...(storageState ? { storageState } : {}) });
     await ctx.route('https://cdn.jsdelivr.net/**', r => r.fulfill({ contentType: 'application/javascript', body: fs.readFileSync(path.join(lib, r.request().url().split('/').pop())) }));
     const page = await ctx.newPage(), errors = []; page.on('pageerror', e => errors.push(e.message));
-    await page.goto(`http://localhost:${port}/`); if (waitAuth) await page.waitForSelector('#auth:not([hidden])', { timeout: 20000 });
+    await page.goto(`http://localhost:${port}${at}`); if (waitAuth) await page.waitForSelector('#auth:not([hidden])', { timeout: 20000 });
     return { page, errors, ctx };
   };
   return (helpers = { build, openApp, port });
@@ -324,18 +325,14 @@ test('two phones: a change made offline survives closing the browser and is save
 });
 test('older version: a phone still on the previous version and one on this version on one account', { skip: dskip }, async () => {
   const { A } = await newCounter('Mixed');
-  const { openApp } = await appHelpers();
-  const old = execFileSync('git', ['show', 'backup/before-reliability-fixes:app/unbroken.html'], { cwd: path.join(__dirname, '..') }).toString();
-  const cur = fs.readFileSync(path.join(__dirname, '../app/unbroken.html'), 'utf8'), dist = path.join(__dirname, '../dist/index.html'), now = fs.readFileSync(dist, 'utf8');
-  fs.writeFileSync(dist, now.split(cur).join(old));
-  const O = await openApp({ waitAuth: true }); fs.writeFileSync(dist, now);
-  assert.equal(await O.page.evaluate(() => document.documentElement.outerHTML.includes('mergeDoc')), false, 'running the previous version');
+  const O = await openOld();
   await logIn(O.page, 'duo'); await O.page.waitForSelector(tile('Mixed'), { timeout: 20000 });
   await cut(A.ctx); await taps(A, 'Mixed', 1); await taps(O, 'Mixed', 1);
   assert.equal(await until(() => dayOf('Mixed'), 1, O.page), 1);
   await back(A);
   assert.equal(await until(() => dayOf('Mixed'), 2, A.page), 2, 'the new version merges with what the old one saved');
   await O.page.reload(); await O.page.waitForSelector(tile('Mixed')); await O.page.waitForTimeout(1500);
+  assert.equal(await isOld(O.page), true, 'still the previous version');
   assert.match(await O.page.textContent(tile('Mixed')), /\b2\b/, 'and the old version shows the merged result');
   assert.deepEqual(O.errors, []); await O.ctx.close();
 });
@@ -394,4 +391,128 @@ test('privacy: when a login runs out, the streaks are hidden behind the login sc
   assert.doesNotMatch(await A.page.evaluate(() => document.body.innerText), /Hidden behind/);
   await A.page.fill('#a-pw', PW); await A.page.tap('#authForm button[type=submit]'); await A.page.waitForSelector(tile('Hidden behind'), { timeout: 20000 });
   duo.B.page.reload().catch(() => {});
+});
+
+/* ---------- Save receipts: one save is applied once ---------- */
+const uidOf = async who => (await sql(`select id from auth.users where email = '${email(who)}'`))[0].id;
+const tokenOf = async page => page.evaluate(k => JSON.parse(localStorage.getItem(k)).access_token, TOKEN());
+test('receipts: a lost answer, then another phone saving, then the retry: the check-in still counts once', { skip: dskip }, async () => {
+  const { A, B } = await newCounter('Lost then saved over');
+  let lost = 0;
+  await A.ctx.route(`https://${HOST()}/rest/v1/user_docs*`, async r => { if (!lost && r.request().method() === 'PATCH') { lost = 1; await r.fetch(); await cut(A.ctx); return r.abort('connectionreset'); } return r.continue(); });
+  await taps(A, 'Lost then saved over', 1);                  // reaches the account, but A never hears back and goes offline
+  assert.equal(await until(() => dayOf('Lost then saved over'), 1, B.page), 1); assert.equal(lost, 1);
+  await B.page.reload(); await B.page.waitForSelector(tile('Lost then saved over'));
+  await taps(B, 'Lost then saved over', 1);                  // B saves over it, so A's stamp is no longer on the streak
+  assert.equal(await until(() => dayOf('Lost then saved over'), 2, B.page), 2);
+  await A.ctx.unroute(`https://${HOST()}/rest/v1/user_docs*`); await back(A);
+  await A.page.waitForTimeout(8000);
+  assert.equal(await dayOf('Lost then saved over'), 2, "A's retry recognised its earlier save from the receipt: 2, not 3");
+  await A.page.reload(); await A.page.waitForSelector(tile('Lost then saved over')); await A.page.waitForTimeout(1500);
+  assert.match(await A.page.textContent(tile('Lost then saved over')), /\b2\b/);
+});
+test('receipts: only the database writes them, each person sees only their own, and a failed save leaves none', { skip: dskip }, async () => {
+  const x = (await signup('rx')).json, y = (await signup('ry')).json, tx = x.access_token, ty = y.access_token, ix = x.user.id;
+  assert.equal((await call('POST', '/rest/v1/user_docs', { body: { doc_id: 'h1', body: { name: 'Read', rev: 'stampone1', app: 2 } }, token: tx })).status, 201);
+  assert.equal((await call('GET', '/rest/v1/save_receipts?select=rev', { token: tx })).json.length, 1, 'the save left a receipt');
+  assert.deepEqual((await call('GET', '/rest/v1/save_receipts?select=rev', { token: ty })).json, [], "others can't see it");
+  assert.notEqual((await call('GET', '/rest/v1/save_receipts?select=rev')).status, 200, 'signed-out visitors get nothing');
+  for (const t of [tx, ty]) assert.notEqual((await call('POST', '/rest/v1/save_receipts', { body: { user_id: ix, rev: 'forged001', doc_id: 'h1' }, token: t })).status, 201, 'nobody can write a receipt');
+  const r1 = await call('PATCH', '/rest/v1/user_docs?doc_id=eq.h1', { body: { body: { name: 'Again', rev: 'stampone1', app: 2 } }, token: tx });
+  assert.notEqual(r1.status, 200, 'the same save cannot be applied twice');
+  const r2 = await call('PATCH', '/rest/v1/user_docs?doc_id=eq.h1&updated_at=eq.2000-01-01T00:00:00Z', { body: { body: { name: 'Stale', rev: 'stampnope1', app: 2 } }, token: tx, prefer: 'return=representation' });
+  assert.deepEqual(r2.json, [], 'a save based on an old copy changes nothing');
+  const r3 = await call('PATCH', '/rest/v1/user_docs?doc_id=eq.h1', { body: { body: { name: 'x'.repeat(310000), rev: 'stamptoobig', app: 2 } }, token: tx });
+  assert.notEqual(r3.status, 200, 'an oversized save is refused');
+  assert.deepEqual((await call('GET', '/rest/v1/save_receipts?select=rev&order=rev', { token: tx })).json.map(r => r.rev), ['stampone1'], 'refused saves left no receipt');
+  assert.equal((await call('GET', '/rest/v1/user_docs?select=body', { token: tx })).json[0].body.name, 'Read', 'the streak is unchanged');
+});
+
+/* ---------- Version gate ---------- */
+const OLD_APP = () => execFileSync('git', ['show', 'backup/before-reliability-fixes:app/unbroken.html'], { cwd: path.join(__dirname, '..') }).toString();
+// Serves the previous version (the one live today) for the next page opened, then switches back.
+async function openOld(o = {}) {
+  const { openApp } = await appHelpers(), now = fs.readFileSync(path.join(__dirname, '../dist/index.html'), 'utf8'), cur = fs.readFileSync(path.join(__dirname, '../app/unbroken.html'), 'utf8');
+  oldHtml = now.split(cur).join(OLD_APP());
+  const ph = await openApp({ ...o, at: '/?v=old' }); assert.equal(await isOld(ph.page), true, 'previous version'); return ph;
+}
+const isOld = page => page.evaluate(() => !document.documentElement.outerHTML.includes('mergeDoc'));
+const gate = async (who, v) => sql(v === null ? `delete from private.config where k = 'min_app:${await uidOf(who)}'` : `insert into private.config (k, v) values ('min_app:${await uidOf(who)}', '${v}') on conflict (k) do update set v = excluded.v`);
+test('version gate: switched off by default, so the version live today keeps saving', { skip: dskip }, async () => {
+  assert.deepEqual(await sql(`select v from private.config where k = 'min_app'`), [{ v: '0' }]);
+  const O = await openOld();
+  await signUp(O.page, 'gateoff');
+  await O.page.tap('.empty-card [data-act="new"]'); await O.page.tap('[data-act="ktype"][data-v="counter"]'); await O.page.fill('#f-name', 'Old saves'); await O.page.tap('[data-act="save"]');
+  await O.page.waitForSelector('.tile'); await O.page.dblclick('.tile .media');
+  const n = async () => { const r = await sql(`select d.body->'log'->>'${todayKey()}' as c from public.user_docs d join auth.users u on u.id = d.user_id where u.email = '${email('gateoff')}' and d.body->>'name' = 'Old saves'`); return r.length ? Number(r[0].c || 0) : null; };
+  assert.equal(await until(n, 1, O.page), 1);
+  assert.deepEqual(O.errors, []); await O.ctx.close();
+});
+test('version gate: when on, the previous version cannot save by any route, keeps its changes through reloads, and they are saved once the phone updates', { skip: dskip }, async () => {
+  const O = await openOld();
+  await signUp(O.page, 'gate');
+  await O.page.tap('.empty-card [data-act="new"]'); await O.page.tap('[data-act="ktype"][data-v="counter"]'); await O.page.fill('#f-name', 'Gated'); await O.page.tap('[data-act="save"]');
+  await O.page.waitForSelector('.tile'); await O.page.waitForTimeout(2500);
+  const n = async () => { const r = await sql(`select d.body->'log'->>'${todayKey()}' as c from public.user_docs d join auth.users u on u.id = d.user_id where u.email = '${email('gate')}' and d.body->>'name' = 'Gated'`); return r.length ? Number(r[0].c || 0) : null; };
+  assert.equal(await n(), 0);
+  await gate('gate', 2);
+  // the app's own save
+  await O.page.dblclick('.tile .media'); await O.page.waitForTimeout(4000);
+  assert.equal(await n(), 0, "the previous version's save is refused");
+  // direct requests, every write route, without the version
+  const tk = await tokenOf(O.page), id = (await sql(`select doc_id from public.user_docs d join auth.users u on u.id = d.user_id where u.email = '${email('gate')}' and d.body->>'name' = 'Gated'`))[0].doc_id;
+  const body = { name: 'Gated', log: { [todayKey()]: 9 } };
+  assert.notEqual((await call('PATCH', `/rest/v1/user_docs?doc_id=eq.${id}`, { body: { body }, token: tk })).status, 200, 'update refused');
+  assert.notEqual((await call('POST', '/rest/v1/user_docs', { body: { doc_id: id, body }, token: tk, prefer: 'resolution=merge-duplicates' })).status, 201, 'upsert refused');
+  assert.notEqual((await call('POST', '/rest/v1/user_docs', { body: { doc_id: 'brandnew', body }, token: tk })).status, 201, 'new item refused');
+  assert.equal(await n(), 0);
+  // the change waits on the phone, through a reload and a dropped connection
+  await O.page.reload(); await O.page.waitForSelector('.tile'); assert.equal(await isOld(O.page), true, 'still the previous version after the reload');
+  await cut(O.ctx); await O.page.waitForTimeout(1000); await uncut(O.ctx); await O.page.waitForTimeout(3000);
+  const mem = await O.page.evaluate(() => { const k = Object.keys(localStorage).find(x => x.startsWith('unbroken:v1:')); return JSON.parse(localStorage.getItem(k)); });
+  assert.equal(Object.values(mem.habits)[0].log[todayKey()], 1, 'the check-in is still on the phone'); assert.equal(Object.values(mem.dirty)[0], 1, 'marked as waiting');
+  assert.equal(await n(), 0);
+  // the phone updates to this version: same browser, same memory
+  const { port } = await appHelpers();
+  await O.page.goto(`http://localhost:${port}/`); await O.page.waitForSelector('.tile', { timeout: 20000 });
+  assert.equal(await O.page.evaluate(() => document.documentElement.outerHTML.includes('mergeDoc')), true, 'now on this version');
+  assert.equal(await until(n, 1, O.page), 1, 'the waiting check-in is saved once, after the update');
+  await O.page.dblclick('.tile .media'); assert.equal(await until(n, 2, O.page), 2, 'this version saves normally with the gate on');
+  assert.equal((await call('PATCH', `/rest/v1/user_docs?doc_id=eq.${id}`, { body: { body: { ...body, rev: 'directok1', app: 2 } }, token: tk })).status < 300, true, 'a request carrying the version is accepted');
+  await O.ctx.close();
+});
+test('version gate: if this version is ever outdated, it says to reload, keeps changes, and saves them after', { skip: dskip }, async () => {
+  const { openApp } = await appHelpers();
+  const P = await openApp();
+  await signUp(P.page, 'gatenew');
+  await P.page.tap('.empty-card [data-act="new"]'); await P.page.tap('[data-act="ktype"][data-v="counter"]'); await P.page.fill('#f-name', 'Future'); await P.page.tap('[data-act="save"]');
+  await P.page.waitForSelector('.tile'); await P.page.waitForTimeout(2500);
+  const n = async () => { const r = await sql(`select d.body->'log'->>'${todayKey()}' as c from public.user_docs d join auth.users u on u.id = d.user_id where u.email = '${email('gatenew')}' and d.body->>'name' = 'Future'`); return r.length ? Number(r[0].c || 0) : null; };
+  await gate('gatenew', 3);
+  await P.page.dblclick('.tile .media');
+  await P.page.waitForFunction(() => /updated/.test(document.querySelector('#notice').textContent), null, { timeout: 15000 });
+  assert.match(await P.page.textContent('#storeNote'), /Reload to keep syncing/);
+  assert.equal(await n(), 0);
+  await P.page.reload(); await P.page.waitForSelector('.tile'); await P.page.waitForTimeout(3000);
+  assert.equal(await n(), 0, 'still refused after a reload, still waiting');
+  await gate('gatenew', null);                                 // stands in for the newer version arriving
+  await P.page.reload(); await P.page.waitForSelector('.tile');
+  assert.equal(await until(n, 1, P.page), 1, 'saved once allowed');
+  assert.deepEqual(P.errors, []); await P.ctx.close();
+});
+test('moving from the version live today to this one: a change made offline in the old version is kept and saved', { skip: dskip }, async () => {
+  const O = await openOld();
+  await signUp(O.page, 'move');
+  await O.page.tap('.empty-card [data-act="new"]'); await O.page.tap('[data-act="ktype"][data-v="counter"]'); await O.page.fill('#f-name', 'Moving'); await O.page.tap('[data-act="save"]');
+  await O.page.waitForSelector('.tile'); await O.page.dblclick('.tile .media'); await O.page.waitForTimeout(2500);
+  const n = async () => { const r = await sql(`select d.body->'log'->>'${todayKey()}' as c from public.user_docs d join auth.users u on u.id = d.user_id where u.email = '${email('move')}' and d.body->>'name' = 'Moving'`); return r.length ? Number(r[0].c || 0) : null; };
+  assert.equal(await until(n, 1, O.page), 1);
+  await cut(O.ctx); await O.page.dblclick('.tile .media'); await O.page.waitForTimeout(1500);   // offline in the old version
+  await uncut(O.ctx);
+  const { port } = await appHelpers();
+  await O.page.route(`https://${HOST()}/rest/v1/user_docs*`, r => r.continue());
+  await O.page.goto(`http://localhost:${port}/`); await O.page.waitForSelector('.tile', { timeout: 20000 });
+  assert.equal(await until(n, 2, O.page), 2, 'the old version\'s offline check-in arrives, once');
+  await O.page.waitForTimeout(3000); assert.equal(await n(), 2);
+  await O.ctx.close();
 });
