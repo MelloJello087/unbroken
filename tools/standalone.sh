@@ -25,4 +25,7 @@ fi
   cat app/unbroken.html
   printf '\n</body></html>\n'
 } > dist/index.html
+# The offline helper is stamped with a fingerprint of this build, so every new version replaces the old saved copy.
+v=$(sha256sum dist/index.html | cut -c1-12)
+sed "s/__VERSION__/$v/" app/sw.js > dist/sw.js
 [ -n "$config" ] && echo "Wrote dist/index.html (with accounts)" || echo "Wrote dist/index.html (saves in this browser only)"

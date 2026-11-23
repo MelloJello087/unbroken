@@ -56,6 +56,10 @@ test('privacy rules: private data, profiles and shared streaks', { skip }, async
   assert.deepEqual((await call('PATCH', `/rest/v1/profiles?user_id=eq.${ia}`, { body: { body: { name: 'hacked' } }, token: tb, prefer: 'return=representation' })).json, []);
   assert.equal((await call('POST', '/rest/v1/public_streaks', { body: { habit_id: 'h1', body: {} }, token: ta })).status, 201);
   assert.deepEqual((await call('DELETE', `/rest/v1/public_streaks?user_id=eq.${ia}`, { token: tb, prefer: 'return=representation' })).json, [], "B cannot remove A's shared streak");
+  const row = (await call('GET', '/rest/v1/user_docs?select=updated_at&doc_id=eq.h1', { token: ta })).json[0];
+  assert.deepEqual((await call('PATCH', `/rest/v1/user_docs?user_id=eq.${ia}&doc_id=eq.h1&updated_at=eq.${encodeURIComponent(row.updated_at)}`, { body: { body: { name: 'hacked' } }, token: tb, prefer: 'return=representation' })).json, [], "B cannot use the save-if-unchanged request on A's data");
+  assert.deepEqual((await call('GET', `/rest/v1/user_docs?select=doc_id,body,updated_at&doc_id=eq.h1&user_id=eq.${ia}`, { token: tb })).json, [], "B cannot read A's version stamp either");
+  assert.equal((await call('GET', '/rest/v1/user_docs?select=body&doc_id=eq.h1', { token: ta })).json[0].body.name, 'Read', "A's data is unchanged");
   for (const t of ['user_docs', 'profiles', 'public_streaks']) assert.notEqual((await call('GET', `/rest/v1/${t}?select=*`)).status, 200, `signed-out visitors cannot read ${t}`);
 });
 
@@ -97,11 +101,18 @@ test('syncing: friends see public streaks, and a streak made private disappears 
   await a.page.tap('#tabFriends'); await a.page.tap('.join [data-act="profileEdit"]'); await a.page.fill('#p-name', 'Tester ' + RUN.slice(-4)); await a.page.tap('[data-act="psave"]'); await a.page.waitForTimeout(3000);
   await b.page.reload(); await b.page.waitForSelector('#tabFriends', { timeout: 20000 }); await b.page.waitForTimeout(1500);
   await b.page.tap('#tabFriends'); await b.page.waitForSelector('.prow', { timeout: 20000 });
-  await b.page.tap(`.prow:has-text("Tester ${RUN.slice(-4)}") [data-act="follow"]`); await b.page.waitForSelector('.mini', { timeout: 20000 });
+  const pubAt = async () => (await sql(`select s.updated_at from public.public_streaks s join auth.users u on u.id = s.user_id where u.email = '${email('fa')}'`) || []).map(r => r.updated_at);
+  const before = await pubAt(), followed = new Date().toISOString();
+  await b.page.tap(`.prow:has-text("Tester ${RUN.slice(-4)}") [data-act="follow"]`);
+  try { await b.page.waitForSelector('.mini', { timeout: 20000 }); }
+  catch (e) { throw new Error(`friend's streak not shown. Shared rows before following: ${JSON.stringify(before)}; followed at ${followed}; rows now: ${JSON.stringify(await pubAt())}; follower's saved list: ${JSON.stringify(await sql(`select d.body from public.user_docs d join auth.users u on u.id = d.user_id where u.email = '${email('fb')}' and d.doc_id = 'social'`))}; follower's screen: ${JSON.stringify((await b.page.evaluate(() => document.querySelector('main').innerText)).slice(0, 400))}`); }
   assert.match(await b.page.getAttribute('.mini', 'aria-label'), /Shared run/);
   await a.page.tap('#tabMine'); await a.page.tap('.tile'); await a.page.waitForSelector('#sheet .detail'); await a.page.tap('[data-act="edit"]'); await a.page.tap('[data-act="more"]'); await a.page.tap('[data-act="hideToggle"]'); await a.page.tap('[data-act="save"]'); await a.page.waitForTimeout(3000);
   await b.page.reload(); await b.page.waitForTimeout(3000); await b.page.tap('#tabFriends'); await b.page.waitForTimeout(3000);
   assert.equal(await b.page.$$eval('.mini', x => x.length), 0, 'the private streak is gone for friends');
+  assert.ok(await b.page.$('.fblock'), 'still following, so the streak is gone because it is private');
+  const kept = await sql(`select d.body from public.user_docs d join auth.users u on u.id = d.user_id where u.email = '${email('fb')}' and d.doc_id = 'social'`);
+  assert.equal(kept[0].body.following.length, 1, 'the follow was saved and kept');
   assert.deepEqual([...a.errors, ...b.errors], []);
 });
 
@@ -119,17 +130,21 @@ async function appHelpers() {
     execFileSync('sh', ['tools/standalone.sh'], { cwd: ROOT, env: { ...process.env } });
   };
   const http = require('http'), dist = path.join(ROOT, 'dist/index.html');
-  const server = http.createServer((q, s) => { s.writeHead(200, { 'Content-Type': 'text/html' }); s.end(fs.readFileSync(dist)); }).listen(0);
+  const server = http.createServer((q, s) => {
+    const p = q.url.split('?')[0], f = p === '/sw.js' ? path.join(ROOT, 'dist/sw.js') : p === '/' ? dist : null;
+    if (!f) { s.writeHead(404); return s.end(); }
+    s.writeHead(200, { 'Content-Type': f.endsWith('.js') ? 'text/javascript' : 'text/html', 'Cache-Control': 'max-age=600' }); s.end(fs.readFileSync(f));
+  }).listen(0);
   const port = await new Promise(r => server.on('listening', () => r(server.address().port)));
   servers.push(server);
-  const openApp = async ({ waitAuth = true } = {}) => {
-    const b = await launch(), ctx = await b.newContext({ ...devices['iPhone 13'] });
+  const openApp = async ({ waitAuth = true, storageState } = {}) => {
+    const b = await launch(), ctx = await b.newContext({ ...devices['iPhone 13'], ...(storageState ? { storageState } : {}) });
     await ctx.route('https://cdn.jsdelivr.net/**', r => r.fulfill({ contentType: 'application/javascript', body: fs.readFileSync(path.join(lib, r.request().url().split('/').pop())) }));
     const page = await ctx.newPage(), errors = []; page.on('pageerror', e => errors.push(e.message));
     await page.goto(`http://localhost:${port}/`); if (waitAuth) await page.waitForSelector('#auth:not([hidden])', { timeout: 20000 });
     return { page, errors, ctx };
   };
-  return (helpers = { build, openApp });
+  return (helpers = { build, openApp, port });
 }
 
 test('live updates: a friend sees a new profile within seconds, without reloading', { skip }, async () => {
@@ -215,4 +230,168 @@ test('logged out: when the login is no longer valid the app asks to log in again
   for (let i = 0; i < 20 && (await logOf('expire'))[todayKey()] !== 1; i++) await a.page.waitForTimeout(1000);
   assert.equal((await logOf('expire'))[todayKey()], 1, 'the change made before the logout was saved');
   assert.deepEqual(a.errors, []);
+});
+
+/* ---------- Two phones on one account: every way they can disagree ---------- */
+// One account, two phones (A and B). Each scenario uses its own counter streak, so scenarios don't affect each other.
+let duo;
+async function pair() {
+  if (duo) return duo;
+  const { build, openApp } = await appHelpers(); await build();
+  const A = await openApp(), B = await openApp();
+  await signUp(A.page, 'duo'); await logIn(B.page, 'duo'); await B.page.waitForSelector('.empty-card,.tile', { timeout: 20000 });
+  return (duo = { A, B });
+}
+const tile = n => `.tile:has(.nm:text-is("${n}"))`;
+const dayOf = async n => { const r = await sql(`select d.body->'log'->>'${todayKey()}' as c from public.user_docs d join auth.users u on u.id = d.user_id where u.email = '${email('duo')}' and d.body->>'name' = '${n}'`); return r.length ? Number(r[0].c || 0) : null; };
+const until = async (f, want, page, secs = 40) => { let v; for (let i = 0; i < secs; i++) { v = await f(); if (v === want) return v; await page.waitForTimeout(1000); } return v; };
+async function newCounter(n) {
+  const { A, B } = await pair();
+  await A.page.tap('#fab'); await A.page.tap('[data-act="ktype"][data-v="counter"]'); await A.page.fill('#f-name', n); await A.page.tap('[data-act="save"]');
+  await A.page.waitForSelector(tile(n)); await until(() => dayOf(n), 0, A.page, 15);
+  await B.page.reload(); await B.page.waitForSelector(tile(n), { timeout: 20000 });
+  return { A, B };
+}
+const back = async ph => { await uncut(ph.ctx); await ph.page.evaluate(() => dispatchEvent(new Event('online'))); };
+const taps = async (ph, n, k) => { for (let i = 0; i < k; i++) { await ph.page.dblclick(tile(n) + ' .media'); await ph.page.waitForTimeout(450); } };
+const minus = async (ph, n) => { await ph.page.tap(tile(n)); await ph.page.waitForSelector('#sheet:not([hidden]) .detail'); await ph.page.tap('[data-act="dec"]'); await ph.page.waitForTimeout(300); await ph.page.tap('.sh-head [data-act="close"]'); await ph.page.waitForTimeout(300); };
+// Log out like a person would: if it says changes are still saving, wait and try again.
+const logOutNow = async p => { for (let i = 0; i < 10; i++) { if (!(await p.$('#sheet:not([hidden]) [data-act="logout"]'))) await p.tap('#btnSettings'); await p.tap('[data-act="logout"]'); try { await p.waitForSelector('#auth:not([hidden])', { timeout: 3000 }); return; } catch (e) {} } throw new Error('could not log out'); };
+const dskip = skip || (!REF && 'needs the management API');
+
+test('two phones: both check in on the same day, one of them offline', { skip: dskip }, async () => {
+  const { A, B } = await newCounter('Same day');
+  await cut(A.ctx); await taps(A, 'Same day', 1); await taps(B, 'Same day', 1);
+  await back(A);
+  assert.equal(await until(() => dayOf('Same day'), 2, A.page), 2);
+});
+test('two phones: one undoes a check-in while the other adds one', { skip: dskip }, async () => {
+  const { A, B } = await newCounter('Undo vs add');
+  await taps(B, 'Undo vs add', 1); assert.equal(await until(() => dayOf('Undo vs add'), 1, B.page), 1);
+  await A.page.reload(); await A.page.waitForSelector(tile('Undo vs add'));
+  await cut(A.ctx); await minus(A, 'Undo vs add');   // A takes the shared check-in back
+  await taps(B, 'Undo vs add', 1); assert.equal(await until(() => dayOf('Undo vs add'), 2, B.page), 2);
+  await back(A);
+  assert.equal(await until(() => dayOf('Undo vs add'), 1, A.page), 1, "one undone, one added");
+});
+test('two phones: both add to the same counter, and every addition counts once', { skip: dskip }, async () => {
+  const { A, B } = await newCounter('Same counter');
+  await cut(A.ctx); await taps(A, 'Same counter', 3); await taps(B, 'Same counter', 2);
+  await back(A);
+  assert.equal(await until(() => dayOf('Same counter'), 5, A.page), 5);
+  await B.page.reload(); await B.page.waitForSelector(tile('Same counter')); await B.page.waitForTimeout(1500);
+  assert.match(await B.page.textContent(tile('Same counter')), /\b5\b/);
+});
+test('two phones: repeated drops and reconnections, and a save whose answer is lost, count every check-in once', { skip: dskip }, async () => {
+  const { A, B } = await newCounter('Flaky');
+  for (let round = 0; round < 3; round++) { await cut(A.ctx); await taps(A, 'Flaky', 1); await taps(B, 'Flaky', 1); await back(A); await A.page.waitForTimeout(1500); }
+  assert.equal(await until(() => dayOf('Flaky'), 6, A.page), 6);
+  let lost = 0;
+  await A.ctx.route(`https://${HOST()}/rest/v1/user_docs*`, async r => { if (!lost && r.request().method() === 'PATCH') { lost = 1; await r.fetch(); return r.abort('connectionreset'); } return r.continue(); });
+  await taps(A, 'Flaky', 1);
+  assert.equal(await until(() => dayOf('Flaky'), 7, A.page), 7); assert.equal(lost, 1, 'the answer was dropped once');
+  await A.page.waitForTimeout(8000);
+  assert.equal(await dayOf('Flaky'), 7, 'still 7 after the retry');
+  await A.ctx.unroute(`https://${HOST()}/rest/v1/user_docs*`);
+});
+test('two phones: a streak deleted on one phone while the other edits it offline stays deleted', { skip: dskip }, async () => {
+  const { A, B } = await newCounter('Delete me');
+  await cut(A.ctx); await taps(A, 'Delete me', 2);
+  await B.page.tap(tile('Delete me')); await B.page.waitForSelector('#sheet .detail'); await B.page.tap('[data-act="ddel"]'); await B.page.tap('[data-act="ddelyes"]');
+  assert.equal(await until(() => dayOf('Delete me'), null, B.page), null);
+  await back(A);
+  await A.page.waitForFunction(n => ![...document.querySelectorAll('.tile .nm')].some(x => x.textContent === n), 'Delete me', { timeout: 40000 });
+  await A.page.waitForTimeout(3000);
+  assert.equal(await dayOf('Delete me'), null, 'not brought back');
+});
+test('two phones: a streak deleted offline stays deleted even though the other phone added to it', { skip: dskip }, async () => {
+  const { A, B } = await newCounter('Delete offline');
+  await cut(A.ctx);
+  await A.page.tap(tile('Delete offline')); await A.page.waitForSelector('#sheet .detail'); await A.page.tap('[data-act="ddel"]'); await A.page.tap('[data-act="ddelyes"]'); await A.page.waitForTimeout(6000);   // past the undo
+  await taps(B, 'Delete offline', 1); assert.equal(await until(() => dayOf('Delete offline'), 1, B.page), 1);
+  await back(A);
+  assert.equal(await until(() => dayOf('Delete offline'), null, A.page), null);
+});
+test('two phones: a change made offline survives closing the browser and is saved when it opens again', { skip: dskip }, async () => {
+  const { A } = await newCounter('Closed');
+  const { openApp } = await appHelpers();
+  await cut(A.ctx); await taps(A, 'Closed', 1);
+  const state = await A.ctx.storageState(); await A.ctx.close();
+  const A2 = await openApp({ waitAuth: false, storageState: state });
+  await A2.page.waitForSelector(tile('Closed'), { timeout: 20000 });
+  assert.equal(await until(() => dayOf('Closed'), 1, A2.page), 1);
+  duo.A = A2;
+});
+test('older version: a phone still on the previous version and one on this version on one account', { skip: dskip }, async () => {
+  const { A } = await newCounter('Mixed');
+  const { openApp } = await appHelpers();
+  const old = execFileSync('git', ['show', 'backup/before-reliability-fixes:app/unbroken.html'], { cwd: path.join(__dirname, '..') }).toString();
+  const cur = fs.readFileSync(path.join(__dirname, '../app/unbroken.html'), 'utf8'), dist = path.join(__dirname, '../dist/index.html'), now = fs.readFileSync(dist, 'utf8');
+  fs.writeFileSync(dist, now.split(cur).join(old));
+  const O = await openApp({ waitAuth: true }); fs.writeFileSync(dist, now);
+  assert.equal(await O.page.evaluate(() => document.documentElement.outerHTML.includes('mergeDoc')), false, 'running the previous version');
+  await logIn(O.page, 'duo'); await O.page.waitForSelector(tile('Mixed'), { timeout: 20000 });
+  await cut(A.ctx); await taps(A, 'Mixed', 1); await taps(O, 'Mixed', 1);
+  assert.equal(await until(() => dayOf('Mixed'), 1, O.page), 1);
+  await back(A);
+  assert.equal(await until(() => dayOf('Mixed'), 2, A.page), 2, 'the new version merges with what the old one saved');
+  await O.page.reload(); await O.page.waitForSelector(tile('Mixed')); await O.page.waitForTimeout(1500);
+  assert.match(await O.page.textContent(tile('Mixed')), /\b2\b/, 'and the old version shows the merged result');
+  assert.deepEqual(O.errors, []); await O.ctx.close();
+});
+
+/* ---------- Opening with no connection ---------- */
+test('offline: after one visit Motif opens with no connection at all, and syncs when it returns', { skip: dskip }, async () => {
+  const { A } = await newCounter('No signal');
+  await A.page.reload(); await A.page.waitForSelector(tile('No signal')); await A.page.waitForTimeout(1500);   // the offline helper is installed
+  assert.ok(await A.page.evaluate(() => navigator.serviceWorker.controller !== null), 'the offline helper controls the page');
+  await A.ctx.setOffline(true);
+  await A.page.reload(); await A.page.waitForSelector(tile('No signal'), { timeout: 20000 });
+  await A.page.waitForFunction(() => /Offline/.test(document.querySelector('#storeNote').textContent), null, { timeout: 15000 });
+  assert.equal(await A.page.$eval('#auth', x => x.hidden), true);
+  await taps(A, 'No signal', 1);
+  await A.ctx.setOffline(false);
+  assert.equal(await until(() => dayOf('No signal'), 1, A.page), 1);
+  assert.deepEqual(A.errors.filter(e => !/Failed to fetch|NetworkError|Load failed/.test(e)), []);
+});
+test('offline: a new version reaches people on their next open, and is the one kept for offline use', { skip: dskip }, async () => {
+  const { A } = await pair();
+  const dist = path.join(__dirname, '../dist/index.html'), sw = path.join(__dirname, '../dist/sw.js'), before = fs.readFileSync(dist, 'utf8'), swBefore = fs.readFileSync(sw, 'utf8');
+  try {
+    fs.writeFileSync(dist, before.replace('<head>', '<head><script>window.__build="next"</script>'));
+    fs.writeFileSync(sw, fs.readFileSync(path.join(__dirname, '../app/sw.js'), 'utf8').replace('__VERSION__', 'next' + Date.now()));
+    await A.page.reload(); await A.page.waitForSelector('.tile,.empty-card', { timeout: 20000 });
+    assert.equal(await A.page.evaluate(() => window.__build), 'next', 'the new version shows on the next open');
+    await A.page.waitForTimeout(2000); await A.ctx.setOffline(true);
+    await A.page.reload(); await A.page.waitForSelector('.tile,.empty-card', { timeout: 20000 });
+    assert.equal(await A.page.evaluate(() => window.__build), 'next', 'and offline too');
+    await A.ctx.setOffline(false);
+  } finally { fs.writeFileSync(dist, before); fs.writeFileSync(sw, swBefore); }
+});
+
+/* ---------- Privacy on a shared phone ---------- */
+test('privacy: the offline copy holds no account data; after logging out nothing of the account is left or shown, and a second account sees only its own', { skip: dskip }, async () => {
+  const { A } = await newCounter('Private thing');
+  const cached = await A.page.evaluate(async () => { const out = []; for (const k of await caches.keys()) { const c = await caches.open(k); for (const r of await c.keys()) { const b = await (await c.match(r)).clone().text().catch(() => ''); out.push({ url: r.url, hit: b.includes('Private thing') }); } } return out; });
+  assert.ok(cached.length >= 1, 'something is kept for offline use');
+  assert.equal(cached.filter(x => /supabase\.co/.test(x.url)).length, 0, 'no account requests are kept');
+  assert.equal(cached.filter(x => x.hit).length, 0, 'no streak data in the offline copy');
+  await logOutNow(A.page);
+  assert.deepEqual(await A.page.evaluate(() => Object.keys(localStorage).filter(k => k.startsWith('unbroken:v1:') || k === 'unbroken:acct')), [], "the account's data is gone from the phone");
+  await A.ctx.setOffline(true); await A.page.reload(); await A.page.waitForSelector('#auth:not([hidden])', { timeout: 20000 });
+  assert.doesNotMatch(await A.page.evaluate(() => document.body.innerText), /Private thing/, 'offline after logging out: only the login screen');
+  await A.ctx.setOffline(false); await A.page.reload(); await A.page.waitForSelector('#auth:not([hidden])', { timeout: 20000 });
+  await signUp(A.page, 'other');
+  assert.doesNotMatch(await A.page.evaluate(() => document.body.innerText), /Private thing/, 'the second account sees only its own streaks');
+  await logOutNow(A.page);
+  await logIn(A.page, 'duo'); await A.page.waitForSelector(tile('Private thing'), { timeout: 20000 });
+});
+test('privacy: when a login runs out, the streaks are hidden behind the login screen, not just covered', { skip: dskip }, async () => {
+  const { A } = await newCounter('Hidden behind');
+  await sql(`delete from auth.sessions where user_id = (select id from auth.users where email = '${email('duo')}')`);
+  await A.page.evaluate(k => { const t = JSON.parse(localStorage.getItem(k)); t.expires_at = Math.floor(Date.now() / 1000) - 60; localStorage.setItem(k, JSON.stringify(t)); }, TOKEN());
+  await A.page.reload(); await A.page.waitForSelector('#auth:not([hidden])', { timeout: 20000 });
+  assert.doesNotMatch(await A.page.evaluate(() => document.body.innerText), /Hidden behind/);
+  await A.page.fill('#a-pw', PW); await A.page.tap('#authForm button[type=submit]'); await A.page.waitForSelector(tile('Hidden behind'), { timeout: 20000 });
+  duo.B.page.reload().catch(() => {});
 });

@@ -702,3 +702,61 @@ test('saving: when storage is nearly full, photos are left out of the phone\'s c
   assert.equal(await page.$eval('#notice', n => n.hidden), true, 'no warning needed');
   assert.equal((await doc(page, 'h1')).photo, pic, 'the photo is untouched in the account');
 });
+test('syncing: a save that reached the account but whose answer was lost is not counted twice', async () => {
+  const { page, errors, today } = await open({ friends: false });
+  await page.evaluate(() => { window.__loseAnswers = 1; });
+  await page.dblclick('.tile[data-id="h2"] .media');   // goal 8: 3 → 4
+  await page.waitForTimeout(4500);
+  assert.equal((await doc(page, 'h2')).log[today], 4, 'one check-in, saved once');
+  assert.match(await page.textContent('.tile[data-id="h2"]'), /4/);
+  noErrors(errors);
+});
+test('syncing: a lost answer is still recognised after the app is closed and opened again', async () => {
+  const { page, today } = await open({ friends: false });
+  await page.evaluate(() => { window.__loseAnswers = 1; });
+  await page.dblclick('.tile[data-id="h2"] .media'); await page.waitForTimeout(700);
+  assert.equal((await doc(page, 'h2')).log[today], 4, 'the save reached the account');
+  await page.reload(); await page.waitForTimeout(2500);   // closed before it could try again
+  assert.equal((await doc(page, 'h2')).log[today], 4);
+});
+test('syncing: an undo made while the check-in is still saving is not lost', async () => {
+  const { page, errors, today } = await open({ friends: false });
+  await page.evaluate(() => { window.__slowWrites = 1200; });
+  await page.dblclick('.tile[data-id="h1"] .media'); await page.waitForTimeout(500);
+  await page.tap('#undoBtn'); await page.waitForTimeout(3500);
+  assert.equal((await doc(page, 'h1')).log[today], undefined, 'the undo wins');
+  assert.doesNotMatch(await page.textContent('.tile[data-id="h1"]'), /\b12\b/);
+  noErrors(errors);
+});
+test('older version: the previous app version opens memory saved by this version and keeps working', async () => {
+  const old = require('child_process').execFileSync('git', ['show', 'backup/before-reliability-fixes:app/unbroken.html'], { cwd: require('path').join(__dirname, '..') }).toString();
+  const s = makeSeed({ friends: false }), cloud = JSON.parse(JSON.stringify(s.seed)), base = JSON.parse(JSON.stringify(cloud['data/users/u_me/h1']));
+  const mine = { ...base, note: 'from new version', log: { ...base.log, [s.today]: 1 } };
+  const cur = require('fs').readFileSync(require('path').join(__dirname, '../app/unbroken.html'), 'utf8'), html = claudePage().split(cur).join(old);
+  assert.ok(!html.includes('mergeDoc'), 'running the previous version');
+  const { page, errors } = await openClaude({ html, init: ([m, arg, ls]) => { for (const [k, v] of Object.entries(ls)) localStorage.setItem(k, v); eval('(' + m + ')')(arg); }, initArg: [mockClaude.toString(), { seed: cloud }, memory({ h1: mine }, { dirty: { h1: 1 }, base: { h1: base }, tries: { h1: { rev: 'abc', sent: mine } }, lite: 1 })] });
+  await settle(page);
+  const d = await doc(page, 'h1'); assert.equal(d.note, 'from new version'); assert.equal(d.log[s.today], 1);
+  noErrors(errors);
+});
+test('syncing: the first follow and the first settings change after a reload are saved, even if the account never had them', async () => {
+  const s = makeSeed(), cloud = JSON.parse(JSON.stringify(s.seed)); delete cloud['data/users/u_me/settings'];
+  const habits = {}; for (const id of ['h1', 'h2', 'h3']) habits[id] = cloud['data/users/u_me/' + id];
+  const { page, errors } = await withMemory(cloud, memory(habits, { srv: ['h1', 'h2', 'h3'] }));
+  await settle(page);
+  await page.tap('#tabFriends'); await page.waitForSelector('.prow');
+  await page.tap('.prow:has-text("Ana") [data-act="follow"]'); await page.waitForTimeout(2000);
+  assert.deepEqual((await doc(page, 'social') || {}).following, ['u_ana'], 'the follow is saved');
+  assert.equal(await page.$$eval('.mini', x => x.length), 1, "and Ana's streak stays on screen");
+  await page.tap('#btnSettings'); await page.tap('[data-act="set"][data-k="layout"][data-v="list"]'); await page.waitForTimeout(2000);
+  assert.equal((await doc(page, 'settings') || {}).layout, 'list', 'the setting is saved, not reset');
+  noErrors(errors);
+});
+test('syncing: memory from before this fix (no record of what the account holds) does not reset the follow list or settings', async () => {
+  const s = makeSeed(), cloud = JSON.parse(JSON.stringify(s.seed)); delete cloud['data/users/u_me/settings'];
+  const habits = {}; for (const id of ['h1', 'h2', 'h3']) habits[id] = cloud['data/users/u_me/' + id];
+  const { page } = await withMemory(cloud, memory(habits));
+  await settle(page);
+  await page.tap('#tabFriends'); await page.waitForSelector('.prow'); await page.tap('.prow:has-text("Ana") [data-act="follow"]'); await page.waitForTimeout(2000);
+  assert.deepEqual((await doc(page, 'social') || {}).following, ['u_ana']);
+});

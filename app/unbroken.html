@@ -401,6 +401,7 @@ input::placeholder,textarea::placeholder{color:var(--ink-3)}
 
 /* ---------- Log in ---------- */
 .auth{position:fixed;inset:0;z-index:40;overflow:auto;background:var(--bg);padding:calc(var(--s8) + env(safe-area-inset-top,0px)) max(var(--s5),env(safe-area-inset-right,0px)) calc(var(--s7) + env(safe-area-inset-bottom,0px)) max(var(--s5),env(safe-area-inset-left,0px))}
+.signin main.wrap,.signin .tabbar,.signin #sheet{visibility:hidden}
 .auth-card{max-width:400px;margin:0 auto;display:flex;flex-direction:column;gap:var(--s6)}
 .auth .tabs{display:grid;grid-template-columns:1fr 1fr;gap:var(--s1);padding:var(--s1);border-radius:var(--r-md);background:var(--surface-2)}
 .auth .tabs button{height:var(--h-sm);border:none;border-radius:var(--r-sm);background:transparent;color:var(--ink-2);font:var(--t-sm);font-weight:600;cursor:pointer}
@@ -586,7 +587,7 @@ const nativeFile=id=>`<label class="hint native">Upload not opening? <input type
 /* ---------- State ---------- */
 let S={habits:{},settings:{...DEF},social:{following:[]}}, cacheMode='local', lastT=0;
 const store={mode:'connecting',ready:false,col:null,unsub:null,why:''};
-const W={pending:new Map(),inflight:new Set(),timers:new Map(),retry:new Map(),base:new Map(),known:new Map()};
+const W={pending:new Map(),inflight:new Set(),timers:new Map(),retry:new Map(),base:new Map(),known:new Map(),tries:new Map()};
 const ui={tab:'mine',reorder:false,showHidden:false,sheet:null,lastFocus:null,dl:null,hadCache:false};
 const social={db:null,user:null,uid:null,can:null,blocked:false,profiles:{},pReady:false,ownKnown:new Map(),ownReady:false,streaks:{},subs:new Map(),peek:{},names:{},avatars:{},leaving:false};
 try{if(localStorage.getItem(TABKEY)==='friends')ui.tab='friends';}catch(e){}
@@ -741,6 +742,8 @@ function avatarHTML(id,cls){
 }
 
 /* ---------- My streaks ---------- */
+// Redraws only when something changed: replacing the list mid-tap would swallow the tap.
+const setHTML=(el,h)=>{if(el._h!==h){el.innerHTML=h;el._h=h;}};
 function sorted(active,evs){
   const s=S.settings.sort,dk=h=>{const e=evs.get(h.id);return e.dueToday&&!e.doneToday?0:e.doneToday?1:2;};
   const sc=h=>{const e=evs.get(h.id);return e.kind==='counter'?-1:e.cur;};
@@ -819,7 +822,7 @@ function renderMine(t){
     sum.innerHTML=`<p class="eyebrow">${esc(date)}</p><h2 class="headline">${esc(head)}</h2>`;
   }
   const list=$('#list'),empty=$('#empty');
-  if(!active.length){const na=Object.values(S.habits).filter(h=>h.archived).length;list.innerHTML=na?`<div class="arch-link"><button type="button" class="btn sm ghost" data-act="archived">Archived (${na})</button></div>`:'';empty.hidden=false;empty.innerHTML=emptyHTML(t);}
+  if(!active.length){const na=Object.values(S.habits).filter(h=>h.archived).length;setHTML(list,na?`<div class="arch-link"><button type="button" class="btn sm ghost" data-act="archived">Archived (${na})</button></div>`:'');empty.hidden=false;empty.innerHTML=emptyHTML(t);}
   else{
     empty.hidden=true;empty.innerHTML='';
     let arr=ui.reorder?[...active].sort((a,b)=>a.order-b.order):sorted(active,evs),hidden=0;
@@ -832,7 +835,7 @@ function renderMine(t){
     const na=Object.values(S.habits).filter(h=>h.archived).length;
     if(na&&!ui.reorder)html+=`<div class="arch-link"><button type="button" class="btn sm ghost" data-act="archived">Archived (${na})</button></div>`;
     if(hidden) html+=`<p class="hidden-note">${arr.length?'':'All done for today. '}${hidden} finished ${hidden===1?'streak is':'streaks are'} hidden. <button class="link" data-act="showhidden">Show</button></p>`;
-    list.innerHTML=html;
+    setHTML(list,html);
   }
   $('#fab').hidden=ui.reorder;
     $('#howto').textContent=ui.reorder?'':active.length?'Double-tap a streak to count it. Tap once to open it.':'';
@@ -863,7 +866,7 @@ function renderFriends(t){
   $('#summary').hidden=true;$('#empty').hidden=true;$('#fab').hidden=true;
   const list=$('#list');
   if(!social.db){
-    list.innerHTML=`<section class="summary"><p class="eyebrow">Friends</p><h2 class="headline">Streaks are better with company</h2><p class="sub">Open this page in Claude while signed in to make a profile, add friends and see their streaks.</p></section>`;
+    setHTML(list,`<section class="summary"><p class="eyebrow">Friends</p><h2 class="headline">Streaks are better with company</h2><p class="sub">Open this page in Claude while signed in to make a profile, add friends and see their streaks.</p></section>`);
     $('#howto').textContent='';return;
   }
   const uid=social.uid,me=social.profiles[uid],fol=S.social.following.filter(id=>id!==uid);
@@ -876,7 +879,7 @@ function renderFriends(t){
   html+=fol.length?fol.sort((a,b)=>displayName(a).localeCompare(displayName(b))).map(id=>followHTML(id,t)).join(''):'<p class="muted-note">Nobody yet. Add people below to follow their streaks.</p>';
   html+='<h2 class="grp">People here</h2>';
   html+=others.length?`<div class="set">${others.map(personRow).join('')}</div>`:`<p class="muted-note">${social.pReady?'Nobody else has made a profile yet. Share this page with friends so they can join.':'Loading people…'}</p>`;
-  list.innerHTML=html;
+  setHTML(list,html);
   $('#howto').textContent='Tap a person to see their streaks. Private streaks never show here.';
   resolveNames([uid,...fol,...others]);
 }
@@ -1540,8 +1543,8 @@ document.addEventListener('visibilitychange',()=>{if(!document.hidden)dayCheck()
 function saveLocal(){
   const dirty={},base={};for(const [id,b] of W.pending)dirty[id]=b===null?0:1;
   for(const id of W.inflight)if(!(id in dirty))dirty[id]=id==='settings'||id==='social'||S.habits[id]?1:0;
-  for(const id of Object.keys(dirty))if(W.base.has(id))base[id]=W.base.get(id);
-  const o={v:2,mode:cacheMode,habits:S.habits,settings:S.settings,social:S.social,dirty,base};
+  const tries={};for(const id of Object.keys(dirty)){if(W.base.has(id))base[id]=W.base.get(id);if(W.tries.has(id))tries[id]=W.tries.get(id);}
+  const o={v:2,mode:cacheMode,habits:S.habits,settings:S.settings,social:S.social,dirty,base,tries,srv:[...W.known.keys()]};
   try{localStorage.setItem(KEY,JSON.stringify(o));return full(false);}catch(e){}
   if(cacheMode==='cloud')try{const h={};for(const [id,x] of Object.entries(S.habits))h[id]=id in dirty||!x.photo?x:{...x,photo:''};
     for(const id of Object.keys(base))if(base[id]&&base[id].photo)base[id]={...base[id],photo:''};
@@ -1559,14 +1562,16 @@ function loadLocal(){
     S.settings=normSettings(o.settings);S.social=normSocial(o.social);
     for(const [id,h] of Object.entries(o.habits||{}))if(SEG.test(id)&&h&&typeof h==='object')S.habits[id]=normHabit({...h,id});
     cacheMode=o.mode==='cloud'?'cloud':'local';
-    const dirty=o.dirty&&typeof o.dirty==='object'?o.dirty:{},base=o.base&&typeof o.base==='object'?o.base:{};
+    const dirty=o.dirty&&typeof o.dirty==='object'?o.dirty:{},base=o.base&&typeof o.base==='object'?o.base:{},tries=o.tries&&typeof o.tries==='object'?o.tries:{};
     for(const [id,alive] of Object.entries(dirty))if(SEG.test(id)){
       W.pending.set(id,id==='settings'?{...S.settings}:id==='social'?{...S.social}:alive&&S.habits[id]?clean(S.habits[id]):null);
       if(id in base)W.base.set(id,base[id]&&typeof base[id]==='object'?normDoc(id,base[id]):null);
+      const t=tries[id];if(t&&typeof t.rev==='string'&&(t.sent===null||isObj(t.sent)))W.tries.set(id,{rev:t.rev,sent:t.sent&&normDoc(id,t.sent)});
     }
-    if(cacheMode==='cloud'){
-      for(const [id,h] of Object.entries(S.habits))if(!(id in dirty))W.known.set(id,clean(h));
-      for(const id of ['settings','social'])if(!(id in dirty))W.known.set(id,clean(S[id]));
+    // Only what the account was seen to hold counts as known; settings and the follow list may never have been saved there.
+    if(cacheMode==='cloud'){const srv=Array.isArray(o.srv)?new Set(o.srv):null;
+      for(const [id,h] of Object.entries(S.habits))if(!(id in dirty)&&(!srv||srv.has(id)))W.known.set(id,clean(h));
+      if(srv)for(const id of ['settings','social'])if(!(id in dirty)&&srv.has(id))W.known.set(id,clean(S[id]));
     }
     return Object.keys(S.habits).length>0;
   }catch(e){return false;}
@@ -1575,17 +1580,22 @@ function persist(id,body){if(!W.base.has(id))W.base.set(id,W.known.has(id)?W.kno
 function schedule(id,ms=350){clearTimeout(W.timers.get(id));W.timers.set(id,setTimeout(()=>{W.timers.delete(id);flush(id);},ms));}
 async function flush(id){
   if(store.mode!=='cloud'||!store.ready||W.inflight.has(id)||!W.pending.has(id))return;
-  const body=W.pending.get(id),base=W.base.has(id)?W.base.get(id):undefined;W.pending.delete(id);W.inflight.add(id);
+  let body=W.pending.get(id),base=W.base.has(id)?W.base.get(id):undefined;W.pending.delete(id);W.inflight.add(id);
   let ok=false,again=0,out=body;
   try{
     const ref=store.col.doc(id);
     for(let n=0;;n++){
-      const cur=typeof ref.get==='function'?await ref.get():null,remote=cur&&cur.exists?normDoc(id,cur.data()||{}):null;
-      out=cur?mergeDoc(base,body,remote):body;
+      const cur=typeof ref.get==='function'?await ref.get():null,raw=cur&&cur.exists?cur.data()||{}:null,remote=raw?normDoc(id,raw):null,t=W.tries.get(id);
+      // An earlier save reached the account but its answer was lost: count it as done, so nothing is added twice.
+      if(t&&raw&&raw.rev===t.rev){W.tries.delete(id);body=mergeDoc(t.sent,body,remote);base=remote;W.base.set(id,remote);}
+      out=!cur?body:remote===null&&(id==='settings'||id==='social')?body:mergeDoc(base,body,remote);
       try{
         if(out===null){if(!cur||remote)await ref.delete();}
-        else if(!remote||!same(out,remote))await (ACCOUNTS?ref.set(out,{version:cur&&cur.exists?cur.version:null}):ref.set(out));
-        break;
+        else if(!remote||!same(out,remote)){
+          const rev=Math.random().toString(36).slice(2,9)+Date.now().toString(36);W.tries.set(id,{rev,sent:body});saveLocal();
+          await (ACCOUNTS?ref.set({...out,rev},{version:cur&&cur.exists?cur.version:null}):ref.set({...out,rev}));
+        }
+        W.tries.delete(id);break;
       }catch(e){if(e&&e.code==='conflict'&&n<4)continue;throw e;}
     }
     ok=true;W.retry.delete(id);
@@ -1746,7 +1756,7 @@ function shimDb(uid){
   const live=(r,run)=>{if(r.t==='user_docs'||!sb.channel)return null;let t;try{return sb.channel('motif-'+r.t+'-'+(r.where.user_id||'all')+'-'+Math.random().toString(36).slice(2,7))
     .on('postgres_changes',{event:'*',schema:'public',table:r.t,...(r.where.user_id?{filter:'user_id=eq.'+r.where.user_id}:{})},()=>{clearTimeout(t);t=setTimeout(run,300);}).subscribe();}catch(e){return null;}};
   const col=path=>{const r=route(path);return {path,doc:id=>doc(path+'/'+id),get:()=>fetchCol(r),
-    onSnapshot(next){let dead=false;const run=()=>fetchCol(r).then(x=>{if(!dead)next(x);}).catch(()=>{});listeners.add(run);run();
+    onSnapshot(next){let dead=false,seq=0,shown=0;const run=()=>{const n=++seq;return fetchCol(r).then(x=>{if(!dead&&n>shown){shown=n;next(x);}}).catch(()=>{});};listeners.add(run);run();
       const iv=setInterval(()=>{if(!document.hidden)run();},r.t==='user_docs'?20000:45000),ch=live(r,run);
       return ()=>{dead=true;listeners.delete(run);clearInterval(iv);if(ch)try{sb.removeChannel(ch);}catch(e){}};}};};
   const doc=path=>{const r=route(path);
@@ -1769,7 +1779,7 @@ function lastAcct(){try{const a=JSON.parse(localStorage.getItem(ACCT)||'null');r
 // Shows this account's streaks from what the phone remembers, before (or without) reaching the server.
 function openAccount(a){
   acct=a;KEY='unbroken:v1:'+a.id;try{localStorage.setItem(ACCT,JSON.stringify(a));}catch(e){}
-  $('#auth').hidden=true;document.body.classList.remove('locked');
+  $('#auth').hidden=true;document.body.classList.remove('locked','signin');
   ui.hadCache=loadLocal();render();
 }
 function useAccount(session){
@@ -1816,7 +1826,7 @@ function waitOnline(){
 function signedOut(){
   if(store.unsub){try{store.unsub();}catch(e){}store.unsub=null;}
   for(const t of W.timers.values())clearTimeout(t);W.timers.clear();
-  store.mode='offline';store.ready=false;saveLocal();render();
+  store.mode='offline';store.ready=false;saveLocal();if(ui.sheet)closeSheet();render();
   A.mode='login';A.email=acct?acct.email:A.email;A.err='';
   A.info=W.pending.size?"You've been logged out on this phone. Log in again to sync. Your latest changes are kept here until you do.":"You've been logged out on this phone. Log in again to see your streaks.";
   showAuth();
@@ -1837,7 +1847,7 @@ function authHTML(){
     </form>
   </div>`;
 }
-function showAuth(){const el=$('#auth');el.innerHTML=authHTML();el.hidden=false;document.body.classList.add('locked');}
+function showAuth(){const el=$('#auth');el.innerHTML=authHTML();el.hidden=false;document.body.classList.add('locked','signin');}
 function authError(e){
   const c=e&&(e.code||e.error_code),m=String((e&&e.message)||'');
   if(c==='invalid_credentials')return 'That email and password don\'t match. Check them and try again.';
@@ -1893,6 +1903,7 @@ async function startAccounts(){
 }
 
 /* ---------- Start ---------- */
+if(!(window.claude&&window.claude.use)&&'serviceWorker' in navigator&&/^(https:|http:\/\/localhost[:/])/.test(location.href))navigator.serviceWorker.register('sw.js').catch(()=>{});
 if(ACCOUNTS)startAccounts();
 else{ui.hadCache=loadLocal();render();connect();}
 })();

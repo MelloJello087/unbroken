@@ -2,9 +2,12 @@
 // exactly as it runs on the Claude test page, without touching anyone's real data.
 // Runs inside the browser page (passed to addInitScript); `seed` fills the store, `photoCheck` is 'ok' | 'bad' | 'none'.
 module.exports = function mockClaude({ seed = {}, me = 'u_me', photoCheck = 'ok' } = {}) {
-  const store = new Map(Object.entries(seed)), listeners = new Set(), writes = [];
+  // The stand-in database survives reloads of the page (like the real one), but not a new browser.
+  let kept = null; try { kept = JSON.parse(sessionStorage.getItem('__mockdb')); } catch (e) {}
+  const store = new Map(Object.entries(kept || seed)), listeners = new Set(), writes = [];
+  const keep = () => { try { sessionStorage.setItem('__mockdb', JSON.stringify(Object.fromEntries(store))); } catch (e) {} };
   window.__store = store; window.__writes = writes;
-  window.__setPhotoCheck = v => { photoCheck = v; }; window.__failWrites = 0;
+  window.__setPhotoCheck = v => { photoCheck = v; }; window.__failWrites = 0; window.__slowWrites = 0; window.__loseAnswers = 0;
   const meta = { fromCache: false, hasPendingWrites: false };
   const snapDoc = (p, d) => ({ id: p.split('/').pop(), exists: true, data: () => JSON.parse(JSON.stringify(d)), metadata: meta });
   const colDocs = path => { const depth = path.split('/').length + 1; return [...store.entries()].filter(([q]) => q.startsWith(path + '/') && q.split('/').length === depth).map(([q, d]) => snapDoc(q, d)); };
@@ -15,8 +18,8 @@ module.exports = function mockClaude({ seed = {}, me = 'u_me', photoCheck = 'ok'
     get: async () => { const docs = colDocs(path); return { docs, size: docs.length, empty: !docs.length, metadata: meta }; } });
   const docRef = path => ({ path,
     get: async () => { const d = store.get(path); return { id: path.split('/').pop(), exists: d !== undefined, data: () => d === undefined ? undefined : JSON.parse(JSON.stringify(d)), metadata: meta }; },
-    set: async d => { writes.push('set ' + path); if (window.__failWrites > 0) { window.__failWrites--; throw { code: 'unavailable' }; } if (!own(path)) throw { code: 'invalid_argument' }; store.set(path, JSON.parse(JSON.stringify(d))); notify(); },
-    delete: async () => { writes.push('del ' + path); if (!own(path)) throw { code: 'invalid_argument' }; store.delete(path); notify(); },
+    set: async d => { writes.push('set ' + path); if (window.__failWrites > 0) { window.__failWrites--; throw { code: 'unavailable' }; } if (!own(path)) throw { code: 'invalid_argument' }; if (window.__slowWrites) await new Promise(r => setTimeout(r, window.__slowWrites)); store.set(path, JSON.parse(JSON.stringify(d))); keep(); notify(); if (window.__loseAnswers > 0) { window.__loseAnswers--; throw { code: 'unavailable' }; } },
+    delete: async () => { writes.push('del ' + path); if (!own(path)) throw { code: 'invalid_argument' }; store.delete(path); keep(); notify(); },
     collection: q => colRef(path + '/' + q) });
   const user = { id: async () => me, can: async () => true, profiles: async ids => Object.fromEntries([].concat(ids).map(i => [i, { id: i, name: '', avatarUrl: '' }])) };
   const sample = Object.assign(async () => ({ text: '' }), {
