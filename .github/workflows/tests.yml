@@ -5,6 +5,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      # Some tests compare with the previous app version kept on this branch.
+      - run: git branch backup/before-reliability-fixes origin/backup/before-reliability-fixes
       - uses: actions/setup-node@v4
         with:
           node-version: 22
