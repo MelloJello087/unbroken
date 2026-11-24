@@ -1,11 +1,11 @@
 # Motif feature roadmap
 
-Status: **Phases 0, 1 and 2 complete. Phase 3 waits for the owner's go-ahead.**
+Status: **Phases 0, 1 and 2 complete. Reliability Stage 1 merged, not yet published. Stage 2 (accounts, privacy, security) is planned in STAGE2_PLAN.md and waits for the owner's approval.**
 Backup of the working version before any of this: branch `backup/v1.0-before-expansion`.
 
 ## Reliability fixes (after the audit)
 
-Stage 1, critical data reliability: **built and tested on branch `reliability-phase1`; on the Claude test page for testing; not on `main` or the live site.** Backup of the version before it: branch `backup/before-reliability-fixes`.
+Stage 1, critical data reliability: **merged into `main` (e623a8f) and tested against the release build (real database and simulated). Not yet published: publishing and checks on the live site are pending** (the site has never been published; see STAGE2_PLAN.md). Backup of the version before it: branch `backup/before-reliability-fixes`.
 - Two phones: changes are merged instead of replaced. Check-ins are combined day by day (counts made on both phones add up), a change to one setting doesn't undo another phone's change to a different one, deleting wins, and a deleted streak never comes back. The account version only saves if nothing changed since it last read; otherwise it merges and tries again.
 - A save that reached the account but whose answer was lost is recognised (each save carries a stamp), so nothing is counted twice, even after the app is closed and reopened.
 - Motif opens with no connection at all after one visit (offline helper `app/sw.js`). The page is always fetched fresh first, so updates show on the next open; account data is never kept by the helper.
