@@ -5,7 +5,13 @@
 const test = require('node:test'), assert = require('node:assert/strict');
 const fs = require('fs'), path = require('path'), { execFileSync } = require('child_process');
 const URL_ = process.env.SUPABASE_URL, KEY = process.env.SUPABASE_PUBLISHABLE_KEY, REF = process.env.SUPABASE_PROJECT_REF;
-const skip = !URL_ || !KEY ? 'set SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY to run the server tests' : false;
+// These tests create and delete accounts. They refuse the real (production) project unless MOTIF_ALLOW_PRODUCTION_TESTS=yes is set
+// on purpose; use the separate test project (motif-test) instead.
+const PRODUCTION_REF = 'balhwwuhluzebtiqpfah';
+const onProduction = [URL_, REF].some(v => String(v || '').includes(PRODUCTION_REF)) && process.env.MOTIF_ALLOW_PRODUCTION_TESTS !== 'yes';
+const skip = !URL_ || !KEY ? 'set SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY to run the server tests'
+  : onProduction ? 'refusing to run against the production project; point SUPABASE_URL and SUPABASE_PROJECT_REF at the test project' : false;
+if (URL_ && REF && !URL_.includes(REF)) throw new Error('SUPABASE_URL and SUPABASE_PROJECT_REF point at different projects');
 const RUN = 'motif-test-' + Date.now().toString(36), STARTED = new Date().toISOString();
 const email = n => `${RUN}-${n}@example.com`, PW = 'Green#Leaf42';
 
